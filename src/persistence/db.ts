@@ -83,6 +83,9 @@ export class Database {
     mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new DatabaseSync(dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
+    // WAL + synchronous NORMAL é o par recomendado: um corte de energia pode perder os últimos instantes, nunca corrompe o banco,
+    // e evita um fsync por instrução (os totais de ranking/progressão são gravados a cada evento).
+    this.db.exec('PRAGMA synchronous = NORMAL');
     this.migrate();
     logger.info({ path: dbPath }, 'SQLite pronto (WAL)');
   }

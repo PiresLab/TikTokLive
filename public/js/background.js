@@ -7,7 +7,9 @@
   class Parallax {
     constructor(scene, layer, key, y, speed) {
       this.speed = speed;
-      this.images = [0, 1].map((i) => scene.add.image(i * R.W, y, key).setOrigin(0, 0));
+      // telhas de R.TILE_W: cobrem qualquer largura de tela (horizontal ou vertical) + 1 pra emenda do scroll
+      const count = Math.ceil(R.W / R.TILE_W) + 1;
+      this.images = Array.from({ length: count }, (_, i) => R.place(scene.add.image(i * R.TILE_W, y, key).setOrigin(0, 0), key));
       layer.add(this.images);
       this.offset = 0;
     }
@@ -18,9 +20,10 @@
 
     update(dt) {
       if (R.lowfx) return;
-      this.offset = (this.offset + this.speed * dt) % R.W;
-      this.images[0].x = -this.offset;
-      this.images[1].x = R.W - this.offset;
+      this.offset = (this.offset + this.speed * dt) % R.TILE_W;
+      this.images.forEach((img, i) => {
+        img.x = i * R.TILE_W - this.offset;
+      });
     }
   }
 
@@ -76,8 +79,11 @@
       this.far = new Parallax(scene, layer, 'mountain_far', R.GROUND_Y - 230, 3);
       this.near = new Parallax(scene, layer, 'mountain_near', R.GROUND_Y - 190, 8);
 
-      this.ground = scene.add.image(0, R.GROUND_Y - 6, 'ground').setOrigin(0, 0);
-      layer.add(this.ground);
+      // chão estático: telhas lado a lado (a arte do chão pode ser mais larga/estreita que a tela)
+      this.groundTiles = Array.from({ length: Math.ceil(R.W / R.TILE_W) }, (_, i) =>
+        R.place(scene.add.image(i * R.TILE_W, R.GROUND_Y - 6, 'ground').setOrigin(0, 0), 'ground'),
+      );
+      layer.add(this.groundTiles);
 
       // vinheta vermelha do chefão
       this.vignette = scene.add.image(0, 0, 'vignette').setOrigin(0, 0).setDisplaySize(R.W, R.H).setTint(0xff1a3a).setAlpha(0);
@@ -159,7 +165,7 @@
       this.skyFill.setTint(bottom);
       this.far.setTint(dark(R.lerpColor(mix('far'), bottom, this.sunT * 0.3)));
       this.near.setTint(dark(mix('near')));
-      this.ground.setTint(dark(mix('ground')));
+      this.groundTiles.forEach((tile) => tile.setTint(dark(mix('ground'))));
       this.vignette.setAlpha(this.bossT * 0.55);
       this.moonGlow.setAlpha(0.35 * (1 - this.sunT * 0.8));
       this.dirty = false;

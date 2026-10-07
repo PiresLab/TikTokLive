@@ -3,9 +3,8 @@
 (function main(R) {
   const WS_URL = `ws://${location.hostname}:8787/?role=${R.role}`;
   const LEADERBOARD_POLL_MS = 15_000;
-  // vertical: 1080 de largura — castelo (440 de largura) à esquerda, monstro à direita, com folga pros ícones do TikTok
-  const CASTLE_X = 250;
-  const MONSTER_X = R.vertical ? 800 : 900;
+  const CASTLE_X = R.LAYOUT.castleX;
+  const MONSTER_X = R.LAYOUT.monsterX;
 
   if (R.role === 'preview') Sound.forceMute(true); // o som sai só do jogo de verdade (OBS), não do iframe do painel
 
@@ -20,6 +19,7 @@
 
     create() {
       R.generateTextures(this);
+      R.createAnims(this);
 
       // Duas camadas/câmeras: o mundo treme com shake/flash, o HUD fica parado.
       this.worldLayer = this.add.layer();

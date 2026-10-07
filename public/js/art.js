@@ -511,6 +511,39 @@
   };
 
   const BOSS_SLUGS = ['dragon', 'titan', 'shadowlord', 'icegolem'];
+
+  /**
+   * Tamanho LÓGICO (em pixels do jogo) de cada textura trocável. Uma imagem do
+   * manifest pode ter qualquer resolução (ex.: 2x ou 3x): é exibida neste tamanho.
+   */
+  R.sizeOf = function sizeOf(key) {
+    if (/^castle_tier\d+$/.test(key)) return { w: R.CASTLE_W, h: R.CASTLE_H };
+    if (key.startsWith('monster_')) {
+      const size = BOSS_SLUGS.includes(key.slice(8)) ? R.BOSS_SIZE : R.NORMAL_SIZE;
+      return { w: size, h: size };
+    }
+    if (key === 'hero_body') return { w: 40, h: 64 };
+    if (key === 'hero_head') return { w: 20, h: 20 };
+    if (key === 'mountain_far' || key === 'mountain_near') return { w: R.TILE_W, h: 240 };
+    if (key === 'ground') return { w: R.TILE_W, h: R.H - R.GROUND_Y + 40 };
+    return null;
+  };
+
+  /** Fator que leva a textura (qualquer resolução) ao tamanho lógico — 1 pra arte procedural. */
+  R.baseScale = function baseScale(scene, key) {
+    const size = R.sizeOf(key);
+    if (!size || !scene.textures.exists(key)) return 1;
+    const sheet = R.SHEETS[key];
+    const frameWidth = sheet ? sheet.frameWidth : scene.textures.getFrame(key).width;
+    return frameWidth > 0 ? size.w / frameWidth : 1;
+  };
+
+  /** Ajusta uma imagem sem animação de escala (fundo) ao tamanho lógico, esticando se a proporção diferir. */
+  R.place = function place(image, key) {
+    const size = R.sizeOf(key);
+    if (size) image.setDisplaySize(size.w, size.h);
+    return image;
+  };
   R.NORMAL_SIZE = 190;
   R.BOSS_SIZE = 330;
 
@@ -614,7 +647,7 @@
     });
 
     const ridge = (key, base, amp, phases, alphaTop) =>
-      ensureCanvas(scene, key, R.W, 240, (ctx, w, h) => {
+      ensureCanvas(scene, key, R.TILE_W, 240, (ctx, w, h) => {
         ctx.beginPath();
         ctx.moveTo(0, h);
         for (let x = 0; x <= w; x += 8) {
@@ -635,14 +668,14 @@
     ridge('mountain_far', 120, [34, 16, 6], [0.3, 1.7, 0.4], 0.95);
     ridge('mountain_near', 150, [28, 14, 8], [2.1, 0.6, 1.3], 1);
 
-    ensureCanvas(scene, 'ground', R.W, R.H - R.GROUND_Y + 40, (ctx, w, h) => {
+    ensureCanvas(scene, 'ground', R.TILE_W, R.H - R.GROUND_Y + 40, (ctx, w, h) => {
       const grd = ctx.createLinearGradient(0, 0, 0, h);
       grd.addColorStop(0, '#ffffff');
       grd.addColorStop(0.08, '#d6d6d6');
       grd.addColorStop(1, '#6a6a6a');
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, w, h);
-      for (let x = 0; x < w; x += 7) {
+      for (let x = 0; x + 6 <= w; x += 7) {
         const hgt = 4 + ((x * 13) % 7);
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.beginPath();

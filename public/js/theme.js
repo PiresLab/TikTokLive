@@ -18,11 +18,27 @@ window.Reino = window.Reino || {};
   // Resolução interna = resolução de saída do TikTok (1080x1920) pra render 1:1, sem reescala.
   R.W = R.vertical ? 1080 : 1280;
   R.H = R.vertical ? 1920 : 720;
-  R.GROUND_Y = R.vertical ? 1240 : 575; // linha do chão: pés do castelo/monstro/heróis
-  /** Fator do HUD: no celular o canvas 1080 aparece ~390pt de largura, então texto/painéis crescem. */
-  R.UI = R.vertical ? 1.4 : 1;
-  /** Zonas cobertas pela interface do TikTok (barra de cima, comentários/botões de baixo, ícones à direita). */
-  R.SAFE = R.vertical ? { top: 170, bottom: 430, side: 30, right: 30 } : { top: 0, bottom: 0, side: 24, right: 24 };
+
+  /** Todas as posições dependentes de orientação ficam aqui (e só aqui). */
+  R.LAYOUT = R.vertical
+    ? {
+        groundY: 1240, // linha do chão: pés do castelo/monstro/heróis
+        castleX: 250,
+        monsterX: 800,
+        // fator do HUD: no celular o canvas 1080 aparece ~390pt de largura, então texto/painéis crescem
+        ui: 1.4,
+        // zonas cobertas pela interface do TikTok (barra de cima, comentários/botões de baixo, ícones à direita)
+        safe: { top: 170, bottom: 430, side: 30, right: 30 },
+      }
+    : { groundY: 575, castleX: 250, monsterX: 900, ui: 1, safe: { top: 0, bottom: 0, side: 24, right: 24 } };
+  R.GROUND_Y = R.LAYOUT.groundY;
+  R.UI = R.LAYOUT.ui;
+  R.SAFE = R.LAYOUT.safe;
+
+  /** Largura lógica de uma "telha" de fundo (montanhas/chão): repete na horizontal e cobre qualquer R.W. */
+  R.TILE_W = 1280;
+  /** Spritesheets declarados no manifest: { chave: { frameWidth, frameHeight, anims } } — preenchido em boot.js. */
+  R.SHEETS = {};
   /** Supersampling dos textos (renderizados em 2x e reduzidos): bordas nítidas em qualquer escala. */
   R.TEXT_RES = 2;
 

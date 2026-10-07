@@ -41,7 +41,10 @@
       this.tier = next;
 
       this.clearDecor();
-      const sprite = this.scene.add.image(this.x, this.groundY, `castle_tier${next}`).setOrigin(0.5, 1);
+      const textureKey = `castle_tier${next}`;
+      const sprite = this.scene.add.image(this.x, this.groundY, textureKey).setOrigin(0.5, 1);
+      sprite.baseScale = R.baseScale(this.scene, textureKey); // arte de maior resolução é exibida no tamanho lógico
+      sprite.setScale(sprite.baseScale);
       this.layer.add(sprite);
       this.sprite = sprite;
       this.buildDecor(next);
@@ -50,12 +53,12 @@
         this.scene.tweens.add({ targets: previous, alpha: 0, duration: 700, onComplete: () => previous.destroy() });
       }
       if (animate && hadPrevious) {
-        sprite.setAlpha(0).setScale(0.9);
+        sprite.setAlpha(0).setScale(0.9 * sprite.baseScale);
         sprite.y += 14;
         this.scene.tweens.add({
           targets: sprite,
           alpha: 1,
-          scale: 1,
+          scale: sprite.baseScale,
           y: this.groundY,
           duration: 900,
           ease: 'Back.Out',
@@ -166,7 +169,7 @@
         yoyo: true,
         repeat: 14,
       });
-      this.scene.tweens.add({ targets: this.sprite, y: this.groundY + 16, scaleY: 0.92, duration: 900, delay: 300, ease: 'Quad.In' });
+      this.scene.tweens.add({ targets: this.sprite, y: this.groundY + 16, scaleY: 0.92 * this.sprite.baseScale, duration: 900, delay: 300, ease: 'Quad.In' });
       this.decor.forEach((d) => d.setVisible(false));
     }
 
@@ -175,7 +178,7 @@
       this.crumbling = false;
       this.tinted = false;
       this.sprite.clearTint().setX(this.x);
-      this.scene.tweens.add({ targets: this.sprite, y: this.groundY, scaleY: 1, duration: 900, ease: 'Back.Out' });
+      this.scene.tweens.add({ targets: this.sprite, y: this.groundY, scaleY: this.sprite.baseScale, duration: 900, ease: 'Back.Out' });
       this.decor.forEach((d) => d.setVisible(true));
     }
 

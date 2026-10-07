@@ -21,8 +21,8 @@
 
     makeHero(nickname) {
       const scene = this.scene;
-      const body = scene.add.image(0, 0, 'hero_body').setOrigin(0.5, 1).setTint(R.hashColor(nickname));
-      const head = scene.add.image(-1, -53, 'hero_head').setOrigin(0.5, 0.5);
+      const body = R.makeVisual(scene, 'hero_body').setOrigin(0.5, 1).setTint(R.hashColor(nickname));
+      const head = R.makeVisual(scene, 'hero_head').setPosition(-1, -53).setOrigin(0.5, 0.5);
       const label = scene.add
         .text(0, -70, R.truncate(nickname, 10), {
           fontFamily: R.FONT,
@@ -55,9 +55,10 @@
     }
 
     startIdle(container) {
+      const body = container.list[0];
       this.scene.tweens.add({
-        targets: container.list[0],
-        scaleY: { from: 1, to: 0.96 },
+        targets: body,
+        scaleY: { from: body.baseScale, to: 0.96 * body.baseScale },
         duration: R.rand(700, 1100),
         yoyo: true,
         repeat: -1,

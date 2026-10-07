@@ -66,13 +66,14 @@
         scene.tweens.add({ targets: aura, alpha: { from: 0.25, to: 0.6 }, scale: { from: aura.scale * 0.92, to: aura.scale * 1.06 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       }
 
-      const sprite = scene.add.image(0, 0, `monster_${slug}`).setOrigin(0.5, 1);
+      const textureKey = `monster_${slug}`;
+      const sprite = R.makeVisual(scene, textureKey).setOrigin(0.5, 1);
       const bar = scene.add.graphics();
       parts.push(sprite, bar);
       container.add(parts);
       this.layer.add(container);
 
-      this.current = { container, sprite, bar, aura, size, isBoss: state.isBoss, slug, walking: !instant };
+      this.current = { container, sprite, bar, aura, size, isBoss: state.isBoss, slug, textureKey, walking: !instant };
       this.hp = state.monsterHp;
       this.maxHp = state.monsterMaxHp;
       this.drawBar();
@@ -84,7 +85,7 @@
         scene.tweens.add({
           targets: sprite,
           y: { from: 0, to: floating ? -12 : -5 },
-          scaleY: { from: 1, to: floating ? 1 : 0.985 },
+          scaleY: { from: sprite.baseScale, to: floating ? sprite.baseScale : 0.985 * sprite.baseScale },
           duration: floating ? 1100 : 640,
           yoyo: true,
           repeat: -1,
@@ -135,6 +136,7 @@
     lunge() {
       const cur = this.current;
       if (!cur || cur.walking) return;
+      R.playOnce(this.scene, cur.sprite, cur.textureKey, 'attack');
       this.scene.tweens.add({
         targets: cur.container,
         x: this.x - 70,
@@ -153,6 +155,7 @@
       const now = this.scene.time.now;
       if (!cur || now - this.lastHitAt < 90) return;
       this.lastHitAt = now;
+      R.playOnce(this.scene, cur.sprite, cur.textureKey, 'hit');
       cur.sprite.setTintFill(0xffffff);
       this.scene.time.delayedCall(60, () => {
         if (cur.sprite.active) cur.sprite.clearTint();

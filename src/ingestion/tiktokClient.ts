@@ -16,6 +16,26 @@ import {
 
 const BASE_RECONNECT_DELAY_MS = 2_000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
+const LAG_REPORT_MS = 30_000;
+const LAG_SAMPLES = 400;
+
+/** Atraso entre o TikTok gerar o evento e ele chegar aqui (usa common.createTime do protobuf). */
+function sourceLagMs(data: unknown, now: number): number | null {
+  const raw = (data as { common?: { createTime?: string | number } } | null)?.common?.createTime;
+  const created = Number(raw);
+  if (!Number.isFinite(created) || created <= 0) return null;
+  const createdMs = created < 1e12 ? created * 1000 : created; // alguns payloads vêm em segundos
+  const lag = now - createdMs;
+  return lag >= 0 && lag < 60_000 ? lag : null;
+}
+
+function cdnFromEnv(client: TikTokLiveClient): void {
+  const cdn = process.env.TIKTOK_CDN?.trim();
+  if (!cdn) return;
+  if (cdn === 'eu') client.cdnEU();
+  else if (cdn === 'us') client.cdnUS();
+  else client.cdn(cdn);
+}
 
 /**
  * Envelopa o piratetok-live-js (lib não-oficial) atrás de um contrato fixo.
@@ -34,6 +54,8 @@ export class TikTokClient extends EventEmitter {
   private stopped = false;
   private connected = false;
   private lastEventAtMs: number | null = null;
+  private lagSamples: number[] = [];
+  private lagTimer: NodeJS.Timeout | null = null;
 
   /** Estado da conexão pro painel admin. */
   get status(): { username: string; connected: boolean; lastEventAt: number | null } {
@@ -46,6 +68,7 @@ export class TikTokClient extends EventEmitter {
 
   private createClient(): TikTokLiveClient {
     const client = new TikTokLiveClient(this.uniqueId);
+    cdnFromEnv(client);
 
     client.on(EventType.connected, (data) => {
       if (this.client !== client) return;
@@ -84,27 +107,48 @@ export class TikTokClient extends EventEmitter {
     });
 
     client.on(EventType.chat, (data) => {
+      this.recordLag(data);
       this.emitGameEvent(normalizeChat(data as ChatData));
     });
 
     client.on(EventType.like, (data) => {
+      this.recordLag(data);
       this.emitGameEvent(normalizeLike(data as LikeData));
     });
 
     client.on(EventType.gift, (data) => {
+      this.recordLag(data);
       const event = normalizeGift(data as GiftPayload);
       if (event) this.emitGameEvent(event);
     });
 
     client.on(EventType.follow, (data) => {
+      this.recordLag(data);
       this.emitGameEvent(normalizeFollow(data as SocialData));
     });
 
     client.on(EventType.share, (data) => {
+      this.recordLag(data);
       this.emitGameEvent(normalizeShare(data as SocialData));
     });
 
     return client;
+  }
+
+  private recordLag(data: unknown): void {
+    const lag = sourceLagMs(data, Date.now());
+    if (lag === null) return;
+    this.lagSamples.push(lag);
+    if (this.lagSamples.length > LAG_SAMPLES) this.lagSamples.shift();
+  }
+
+  private reportLag(): void {
+    if (this.lagSamples.length === 0) return;
+    const sorted = [...this.lagSamples].sort((a, b) => a - b);
+    const avg = sorted.reduce((sum, v) => sum + v, 0) / sorted.length;
+    const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+    logger.info({ samples: sorted.length, avgMs: Math.round(avg), p95Ms: Math.round(p95), cdn: process.env.TIKTOK_CDN || 'padrão' }, 'Latência TikTok → app (criação do evento até chegar aqui)');
+    this.lagSamples = [];
   }
 
   private emitGameEvent(event: GameEvent): void {
@@ -125,6 +169,7 @@ export class TikTokClient extends EventEmitter {
 
   async connect(): Promise<void> {
     if (this.stopped) return;
+    if (!this.lagTimer) this.lagTimer = setInterval(() => this.reportLag(), LAG_REPORT_MS);
     const client = this.createClient();
     this.client = client;
     try {
@@ -141,6 +186,10 @@ export class TikTokClient extends EventEmitter {
 
   async stop(): Promise<void> {
     this.stopped = true;
+    if (this.lagTimer) {
+      clearInterval(this.lagTimer);
+      this.lagTimer = null;
+    }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

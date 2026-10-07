@@ -52,7 +52,7 @@
 
       // números de dano agregados (a cada ~220ms) a partir da queda de HP do monstro
       this.time.addEvent({
-        delay: 220,
+        delay: 110,
         loop: true,
         callback: () => {
           if (this.pendingDamage < 1) return;
@@ -146,7 +146,7 @@
     applyFx(e) {
       switch (e.type) {
         case 'like':
-          this.fx.fireLike();
+          this.fx.fireLike(e.likeCount ?? 1);
           break;
         case 'comment':
           this.hud.addFeed(`${e.user.nickname}: ${R.truncate(e.comment, 40)}`, '#9fd3ff');

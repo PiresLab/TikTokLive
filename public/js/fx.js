@@ -182,23 +182,28 @@
 
     // ---------------------------------------------------------------- eventos de viewer
 
-    fireLike() {
+    /** Lote grande de curtidas (o TikTok manda agrupado) vira até 3 disparos escalonados, não 1. */
+    fireLike(count = 1) {
       const now = this.scene.time.now;
       if (now - this.lastLikeAt < 120) return;
       this.lastLikeAt = now;
-      this.fire({
-        from: this.sourcePoint(),
-        to: this.targetPoint(),
-        texture: 'spark',
-        tint: 0x9fe8ff,
-        scale: 0.55,
-        duration: R.rand(300, 420),
-        arc: R.rand(40, 110),
-        onHit: (x, y) => {
-          this.refs.monsters.hit();
-          this.burst(x, y, 0x9fe8ff, 5);
-        },
-      });
+      const shots = Math.min(3, Math.max(1, Math.ceil(count / 4)));
+      for (let i = 0; i < shots; i += 1) {
+        this.fire({
+          from: this.sourcePoint(),
+          to: this.targetPoint(),
+          texture: 'spark',
+          tint: 0x9fe8ff,
+          scale: 0.55,
+          duration: R.rand(170, 250),
+          delay: i * 70,
+          arc: R.rand(30, 80),
+          onHit: (x, y) => {
+            this.refs.monsters.hit();
+            this.burst(x, y, 0x9fe8ff, 5);
+          },
+        });
+      }
       if (Math.random() < 0.25) this.refs.heroes.hop();
     }
 
@@ -212,8 +217,8 @@
         texture: 'glow',
         tint: 0x8fb8ff,
         scale: 0.3,
-        duration: R.rand(380, 520),
-        arc: R.rand(70, 140),
+        duration: R.rand(230, 330),
+        arc: R.rand(50, 100),
         onHit: (x, y) => {
           this.refs.monsters.hit();
           this.burst(x, y, 0x8fb8ff, 7);

@@ -32,6 +32,8 @@
       this.lastHighAt = -9999;
       this.lastMidAt = -9999;
       this.lastSpellAt = -9999;
+      /** () => retângulos do HUD a evitar; main liga ao HUD depois que ele existe. */
+      this.obstacles = null;
       this.punching = false;
       this.stopped = false;
     }
@@ -620,6 +622,27 @@
 
     // ---------------------------------------------------------------- texto flutuante
 
+    /**
+     * Textos flutuantes ficam no mundo, atrás do HUD: se a trajetória cruzar um painel
+     * (ex.: "ROAR!" sobre o ranking à direita), empurra pra esquerda do painel, ou pra baixo dele se não couber.
+     */
+    avoidHud(x, y, w, h, rise) {
+      let px = x;
+      let py = y;
+      const pad = 14;
+      for (const r of this.obstacles ? this.obstacles() : []) {
+        const left = px - w / 2;
+        const right = px + w / 2;
+        const top = py - rise - h / 2;
+        const bottom = py + h / 2;
+        if (right < r.x - pad || left > r.x + r.w + pad || bottom < r.y - pad || top > r.y + r.h + pad) continue;
+        const leftX = r.x - pad - w / 2;
+        if (leftX >= w / 2 + 8) px = leftX;
+        else py = r.y + r.h + pad + h / 2 + rise;
+      }
+      return { x: px, y: py };
+    }
+
     floatText(x, y, text, o = {}) {
       const t = this.scene.add
         .text(x, y, text, {
@@ -633,11 +656,14 @@
         })
         .setOrigin(0.5)
         .setScale(0.4);
+      const rise = o.rise ?? 60;
+      const spot = this.avoidHud(x, y, t.width, t.height, rise);
+      t.setPosition(spot.x, spot.y);
       this.addTop(t);
       this.scene.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' });
       this.scene.tweens.add({
         targets: t,
-        y: y - (o.rise ?? 60),
+        y: spot.y - rise,
         alpha: 0,
         delay: (o.duration ?? 900) * 0.35,
         duration: (o.duration ?? 900) * 0.65,

@@ -24,7 +24,30 @@
     ...extra,
   });
 
+  /**
+   * Moldura 9-slice (textura "ui_panel", procedural ou arte do manifest): cantos de 48 px da textura
+   * exibidos a 0,5x, então 24 px lógicos. Mesma interface do Graphics usado por panel() (clear/set).
+   */
+  class PanelFrame {
+    constructor(scene) {
+      this.isFrame = true;
+      this.node = scene.add.nineslice(0, 0, 'ui_panel', undefined, 96, 96, 48, 48, 48, 48).setOrigin(0, 0).setScale(0.5);
+    }
+
+    set(x, y, w, h, o = {}) {
+      this.node.setPosition(x, y);
+      this.node.setSize(w * 2, h * 2);
+      this.node.setTint(R.lerpColor(o.border ?? R.TOKENS.border, 0xffffff, 0.35));
+    }
+
+    clear() {}
+  }
+
   function panel(g, x, y, w, h, o = {}) {
+    if (g.isFrame) {
+      g.set(x, y, w, h, o);
+      return;
+    }
     const T = R.TOKENS;
     const radius = o.radius ?? T.radius;
     g.fillStyle(0x000000, T.shadowAlpha);
@@ -90,6 +113,21 @@
       return obj;
     }
 
+    /** Fundo de painel grande: moldura 9-slice (ou Graphics, se a moldura não estiver disponível). Painéis baixos (<48) ficam em Graphics. */
+    panelBg(parent) {
+      const s = this.scene;
+      const frame = typeof s.add.nineslice === 'function' && s.textures.exists('ui_panel') ? new PanelFrame(s) : s.add.graphics();
+      this.add(frame.node ?? frame, parent);
+      return frame;
+    }
+
+    /** Ícone de arte (manifest, chaves ic_*) em tamanho lógico; null se a arte não existe (o chamador cai no emoji). */
+    iconAt(parent, key, x, y, size) {
+      if (!this.scene.textures.exists(key)) return null;
+      const img = this.scene.add.image(x, y, key).setOrigin(0, 0).setDisplaySize(size, size);
+      return this.add(img, parent);
+    }
+
     /** Container escalado por K em que o ponto local (lx, ly) cai em (x, y) da tela. */
     anchor(x, y, lx, ly) {
       return this.add(this.scene.add.container(x - K * lx, y - K * ly).setScale(K));
@@ -100,11 +138,13 @@
     buildLeft() {
       const s = this.scene;
       const c = this.anchor(R.SAFE.side, this.rowTop, 24, 16);
-      this.leftBg = this.add(s.add.graphics(), c);
+      this.leftRect = { x: R.SAFE.side, y: this.rowTop, w: 330 * K, h: 98 * K };
+      this.leftBg = this.panelBg(c);
       panel(this.leftBg, 24, 16, 330, 98);
       this.eraText = this.add(s.add.text(42, 24, '', TEXT({ fontSize: '21px', fontStyle: 'bold', color: '#ffd98a' })), c);
       this.dayText = this.add(s.add.text(336, 29, '', TEXT({ fontSize: '14px', color: '#a9b8ea' })).setOrigin(1, 0), c);
-      this.add(s.add.text(42, 58, '🏰 Reino', TEXT({ fontSize: '13px', color: '#bfeee9' })), c);
+      const castleIcon = this.iconAt(c, 'ic_castle', 42, 57, 16);
+      this.add(s.add.text(castleIcon ? 62 : 42, 58, castleIcon ? 'Reino' : '🏰 Reino', TEXT({ fontSize: '13px', color: '#bfeee9' })), c);
       this.kingdomNum = this.add(s.add.text(336, 59, '', TEXT({ fontSize: '12px', color: '#bfeee9' })).setOrigin(1, 0), c);
       this.kBar = this.add(s.add.graphics(), c);
 
@@ -123,7 +163,8 @@
     buildWave() {
       const s = this.scene;
       const c = this.anchor(R.W / 2, this.waveTop, DESIGN_CX, 12);
-      this.waveBg = this.add(s.add.graphics(), c);
+      this.waveRect = { x: R.W / 2 - 240 * K, y: this.waveTop, w: 480 * K, h: 96 * K };
+      this.waveBg = this.panelBg(c);
       panel(this.waveBg, 400, 12, 480, 96, { border: 0x5a2a3a, fill: 0x1a0e1c });
       this.waveTitle = this.add(s.add.text(DESIGN_CX, 20, '', TEXT({ fontSize: '24px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 4 })).setOrigin(0.5, 0), c);
       this.waveName = this.add(s.add.text(DESIGN_CX, 50, '', TEXT({ fontSize: '14px', color: '#ffc9d3' })).setOrigin(0.5, 0), c);
@@ -134,7 +175,9 @@
     buildRight() {
       const s = this.scene;
       const c = this.anchor(R.W - R.SAFE.right - 300 * K, this.rowTop, DESIGN_W - 300 - 24, 16);
-      this.rightBg = this.add(s.add.graphics(), c);
+      this.rightBg = this.panelBg(c);
+      // ícones de arte nos títulos dos blocos (sem arte, o emoji continua no texto)
+      this.rightIcons = ['ic_trophy', 'ic_chat', 'ic_crown', 'ic_swords'].map((key) => this.iconAt(c, key, DESIGN_W - 40 - 262, 0, 16));
       this.rightTexts = ['gifters', 'chatters', 'hall', 'heroes'].map((key) =>
         this.add(
           s.add.text(
@@ -207,9 +250,14 @@
       });
     }
 
+    /** Painéis fixos do HUD (retângulos em tela): textos flutuantes do mundo desviam deles em vez de sumir atrás. */
+    obstacles() {
+      return [this.leftRect, this.waveRect, this.goalRect, this.rightRect].filter(Boolean);
+    }
+
     /** Pancada no castelo: o painel do Reino pisca. */
     flashKingdom() {
-      this.scene.tweens.add({ targets: [this.leftBg, this.kBar], alpha: { from: 0.25, to: 1 }, duration: 110, yoyo: true, repeat: 2 });
+      this.scene.tweens.add({ targets: [this.leftBg.node ?? this.leftBg, this.kBar], alpha: { from: 0.25, to: 1 }, duration: 110, yoyo: true, repeat: 2 });
     }
 
     /** Abertura de chefão: faixas de cinema entram, o nome aparece grande e tudo sai. */
@@ -295,10 +343,12 @@
       const x = R.vertical ? R.SAFE.side : R.W / 2 - 165;
       const y = R.vertical ? this.rowTop + 98 * K + 14 : R.H - 66;
       const c = this.anchor(x, y, 0, 0);
+      this.goalRect = { x, y, w: 330 * K, h: 58 * K };
       this.goalBox = c;
-      this.goalBg = this.add(s.add.graphics(), c);
+      this.goalBg = this.panelBg(c);
       panel(this.goalBg, 0, 0, 330, 58, { border: 0x2f6b4a, fill: 0x0c1a1a });
-      this.goalTitle = this.add(s.add.text(12, 5, '', TEXT({ fontSize: '14px', fontStyle: 'bold', color: '#ffe9a8', strokeThickness: 3 })), c);
+      this.goalIcon = this.iconAt(c, 'ic_target', 12, 5, 16);
+      this.goalTitle = this.add(s.add.text(this.goalIcon ? 32 : 12, 5, '', TEXT({ fontSize: '14px', fontStyle: 'bold', color: '#ffe9a8', strokeThickness: 3 })), c);
       this.goalCount = this.add(s.add.text(318, 6, '', TEXT({ fontSize: '13px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 3 })).setOrigin(1, 0), c);
       this.goalBar = this.add(s.add.graphics(), c);
       this.goalReward = this.add(s.add.text(12, 41, '', TEXT({ fontSize: '11px', color: '#a9f5c8', strokeThickness: 2 })), c);
@@ -325,7 +375,7 @@
       this.goal = goal;
       this.gTarget = goal.target > 0 ? goal.progress / goal.target : 0;
       if (instant || !sameGoal) this.gDisp = this.gTarget;
-      this.goalTitle.setText(R.truncate(goal.title, 30));
+      this.goalTitle.setText(R.truncate(this.goalIcon ? goal.title.replace(/^🎯\s*/, '') : goal.title, 30));
       this.goalCount.setText(`${fmt(goal.progress)} / ${fmt(goal.target)}`);
       this.goalReward.setText(goal.rewardText);
       this.drawGoalBar();
@@ -349,7 +399,7 @@
     }
 
     /** Aviso empilhado (nível, missão, conquista). Some sozinho; no máximo 3 na tela. */
-    toast({ icon, title, sub, color = 0xffd166 }) {
+    toast({ icon, iconKey, title, sub, color = 0xffd166 }) {
       const s = this.scene;
       const hexColor = `#${color.toString(16).padStart(6, '0')}`;
       const w = 330;
@@ -357,7 +407,9 @@
       const box = s.add.container(0, 0).setScale(K).setAlpha(0);
       const bg = s.add.graphics();
       panel(bg, 0, 0, w, h, { radius: 12, border: color, fill: 0x0c1226, alpha: 0.88 });
-      const iconText = s.add.text(10, h / 2, icon, TEXT({ fontSize: '22px', strokeThickness: 0 })).setOrigin(0, 0.5);
+      const iconText = iconKey && s.textures.exists(iconKey)
+        ? s.add.image(10, h / 2 - 13, iconKey).setOrigin(0, 0).setDisplaySize(26, 26)
+        : s.add.text(10, h / 2, icon, TEXT({ fontSize: '22px', strokeThickness: 0 })).setOrigin(0, 0.5);
       const titleText = s.add.text(44, sub ? 5 : 6, R.truncate(title, 28), TEXT({ fontSize: '14px', fontStyle: 'bold', color: hexColor, strokeThickness: 3 }));
       box.add([bg, iconText, titleText]);
       if (sub) box.add(s.add.text(44, 25, R.truncate(sub, 36), TEXT({ fontSize: '12px', color: '#dfe6ff', strokeThickness: 2 })));
@@ -408,10 +460,13 @@
       const rows = card.missions.length;
       const h = 134 + rows * 22 + 30;
       const box = s.add.container(0, 0);
-      const bg = s.add.graphics();
+      const bg = typeof s.add.nineslice === 'function' && s.textures.exists('ui_panel') ? new PanelFrame(s) : s.add.graphics();
       panel(bg, 0, 0, w, h, { radius: 16, border: tierColor, fill: 0x0b1020, alpha: 0.94 });
-      box.add(bg);
-      box.add(s.add.text(16, 12, `${classIcon} ${R.truncate(card.nickname, 16)}`, TEXT({ fontSize: '22px', fontStyle: 'bold', strokeThickness: 4 })));
+      box.add(bg.node ?? bg);
+      const classKeyIcon = `ic_class_${card.classKey}`;
+      const hasClassArt = s.textures.exists(classKeyIcon);
+      if (hasClassArt) box.add(s.add.image(16, 8, classKeyIcon).setOrigin(0, 0).setDisplaySize(32, 32));
+      box.add(s.add.text(hasClassArt ? 54 : 16, 12, hasClassArt ? R.truncate(card.nickname, 14) : `${classIcon} ${R.truncate(card.nickname, 16)}`, TEXT({ fontSize: '22px', fontStyle: 'bold', strokeThickness: 4 })));
       box.add(s.add.text(w - 16, 14, `Nv ${card.level}`, TEXT({ fontSize: '22px', fontStyle: 'bold', color: tierHex, strokeThickness: 4 })).setOrigin(1, 0));
       box.add(s.add.text(16, 44, `${card.title} · ${card.className}`, TEXT({ fontSize: '14px', color: tierHex, strokeThickness: 2 })));
 
@@ -492,20 +547,23 @@
       const chatters = (data.today?.chatters ?? []).slice(0, 3);
       const hall = (data.hallOfFame ?? []).slice(0, 3);
 
+      const head = (i, emoji, title) => (this.rightIcons[i] ? `     ${title}` : `${emoji} ${title}`);
       const blocks = [
-        `🏆 Presentes hoje\n${lines(gifters, (g, i) => `${i + 1}. ${lv(g)}${R.truncate(g.nickname, 12)} — ${fmt(g.value)}💎`, '—')}`,
-        `💬 Chat hoje\n${lines(chatters, (c, i) => `${i + 1}. ${lv(c)}${R.truncate(c.nickname, 12)} — ${fmt(c.value)}`, '—')}`,
-        `👑 Hall da Fama\n${lines(hall, (h) => `Dia ${h.day}: ${R.truncate(h.topGifterNickname ?? '—', 12)} (${fmt(h.topGifterValue)}💎)`, '—')}`,
-        `⚔️ ${fmt(data.heroCount ?? 0)} heróis no Reino`,
+        `${head(0, '🏆', 'Presentes hoje')}\n${lines(gifters, (g, i) => `${i + 1}. ${lv(g)}${R.truncate(g.nickname, 12)} — ${fmt(g.value)}💎`, '—')}`,
+        `${head(1, '💬', 'Chat hoje')}\n${lines(chatters, (c, i) => `${i + 1}. ${lv(c)}${R.truncate(c.nickname, 12)} — ${fmt(c.value)}`, '—')}`,
+        `${head(2, '👑', 'Hall da Fama')}\n${lines(hall, (h) => `Dia ${h.day}: ${R.truncate(h.topGifterNickname ?? '—', 12)} (${fmt(h.topGifterValue)}💎)`, '—')}`,
+        this.rightIcons[3] ? `     ${fmt(data.heroCount ?? 0)} heróis no Reino` : `⚔️ ${fmt(data.heroCount ?? 0)} heróis no Reino`,
       ];
 
       let y = 30;
       this.rightTexts.forEach((text, i) => {
         text.setText(blocks[i]).setPosition(DESIGN_W - 40 - 262, y);
+        this.rightIcons[i]?.setPosition(DESIGN_W - 40 - 262, y + 1);
         y += text.height + 14;
       });
       this.rightBg.clear();
       panel(this.rightBg, DESIGN_W - 300 - 24, 16, 300, y - 8 - 8 + 6);
+      this.rightRect = { x: R.W - R.SAFE.right - 300 * K, y: this.rowTop, w: 300 * K, h: (y - 10) * K };
     }
 
     setLeaderboard(data) {

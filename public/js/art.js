@@ -650,6 +650,65 @@
       ctx.restore();
     });
 
+    // moldura 9-slice dos painéis do HUD (192x192, cantos de 48): borda prateada com chanfro e rebites, miolo escuro.
+    // Em tons neutros: o HUD tinge a borda pela cor de cada painel. Substituível por arte via manifest ("ui_panel").
+    ensureCanvas(scene, 'ui_panel', 192, 192, (ctx, w, h) => {
+      const rr = (x, y, ww, hh, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + ww, y, x + ww, y + hh, r);
+        ctx.arcTo(x + ww, y + hh, x, y + hh, r);
+        ctx.arcTo(x, y + hh, x, y, r);
+        ctx.arcTo(x, y, x + ww, y, r);
+        ctx.closePath();
+      };
+      // contorno escuro (fino) + corpo metálico: borda total de ~11 px de textura = ~5,5 px lógicos
+      rr(1, 1, w - 2, h - 2, 28);
+      ctx.fillStyle = '#1b1e2a';
+      ctx.fill();
+      const metal = ctx.createLinearGradient(0, 0, 0, h);
+      metal.addColorStop(0, '#fbfcff');
+      metal.addColorStop(0.5, '#c4cad9');
+      metal.addColorStop(1, '#8f97ab');
+      rr(3, 3, w - 6, h - 6, 26);
+      ctx.fillStyle = metal;
+      ctx.fill();
+      // chanfro: luz em cima, sombra embaixo
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, w, h / 2);
+      ctx.clip();
+      rr(4.5, 4.5, w - 9, h - 9, 24.5); // o caminho do traço vem DEPOIS do recorte (beginPath() apaga o anterior)
+      ctx.stroke();
+      ctx.restore();
+      // miolo escuro (levemente translúcido) com contorno interno
+      rr(9, 9, w - 18, h - 18, 20);
+      ctx.fillStyle = '#12151f';
+      ctx.fill();
+      rr(10.5, 10.5, w - 21, h - 21, 18.5);
+      const inner = ctx.createLinearGradient(0, 0, 0, h);
+      inner.addColorStop(0, 'rgba(70,74,92,0.92)');
+      inner.addColorStop(1, 'rgba(40,43,58,0.92)');
+      ctx.fillStyle = inner;
+      ctx.fill();
+      // rebites nos quatro cantos (sobre a borda/miolo)
+      [[17, 17], [w - 17, 17], [17, h - 17], [w - 17, h - 17]].forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 4.6, 0, Math.PI * 2);
+        ctx.fillStyle = '#1b1e2a';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+        const rivet = ctx.createRadialGradient(x - 1.1, y - 1.1, 0.4, x, y, 3.4);
+        rivet.addColorStop(0, '#ffffff');
+        rivet.addColorStop(1, '#9aa2b6');
+        ctx.fillStyle = rivet;
+        ctx.fill();
+      });
+    });
+
     // adereços de bioma (cinza claro: o jogo tinge pela Era e pela hora do dia)
     ensureCanvas(scene, 'tree_pine', 90, 150, (ctx) => {
       ctx.fillStyle = '#9a9a9a';

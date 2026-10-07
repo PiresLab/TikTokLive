@@ -47,6 +47,23 @@ Cada imagem pode ter **qualquer resolução**: o jogo a exibe no **tamanho lógi
 | `ground` | 1280×185 | 2560×370 | **Telha horizontal** que repete e recebe a cor da Era. Faça a grama no topo e a terra embaixo. No vertical, abaixo da telha o jogo continua o chão com um degradê (escurecendo) calculado a partir do tom da borda de baixo da sua imagem, então a borda de baixo deve ser terra lisa. |
 | `glow` `spark` `star` `ring` `flag` `arrow` `vignette` `px` | vários | — | Texturas de efeito (brilho, faísca, estrela, onda de choque, bandeira, flecha, vinheta do chefão). Brancas: o jogo aplica a cor. Mantenha o tamanho original. |
 
+## Arte do HUD (opcional)
+
+O HUD tem moldura e ícones desenhados por código; estes arquivos, se existirem no manifest, substituem:
+
+| Chave | Tamanho | Observação |
+|---|---|---|
+| `ui_panel` | 192×192 | Moldura **9-slice** dos painéis (Reino, onda, ranking, meta, cartão `!perfil`). Cantos de **48 px** (exibidos a 0,5x = 24 px lógicos); as faixas do meio são esticadas, então a borda precisa ser **uniforme** entre os cantos (sem detalhes no meio). Borda em **prata/branco/cinza claro** (o HUD tinge pela cor de cada painel) e miolo **escuro e levemente translúcido** (o miolo também é tingido, então mantenha-o cinza escuro neutro). Fora da borda arredondada, transparente. |
+| `ic_castle` `ic_trophy` `ic_chat` `ic_crown` `ic_swords` | 64×64 | Ícones dos títulos do ranking e do painel do Reino (castelo, troféu, balão de chat, coroa, espadas cruzadas). Exibidos a 16 px lógicos: formas grossas e legíveis. |
+| `ic_target` `ic_level` | 64×64 | Meta coletiva (alvo com flecha) e subida de nível (seta verde num selo dourado), usados na meta e nos avisos. |
+| `ic_class_knight` `ic_class_archer` `ic_class_mage` `ic_class_guardian` | 64×64 | Classe no cartão `!perfil`: espada, arco, cajado com orbe, escudo com sol. |
+
+Sem um ícone, o HUD usa o emoji equivalente; sem `ui_panel`, usa a moldura procedural.
+
+**Prompts (Nano Banana / Gemini)** — gere em fundo magenta chapado (`#FF00FF`), remova o fundo e reduza (ícones 64×64; moldura 192×192):
+- Moldura: *"Game UI panel frame, ornate fantasy cartoon style, rectangular panel with a uniform ornamental border, rounded corners, small rivets at the four corners, border ONLY in light silver-gray and white metal tones with a dark outline, same thickness on all four sides (about 6 percent of the width), perfectly symmetrical, the inside of the panel is flat solid magenta and everything outside the frame is also flat solid magenta, no text, centered."* Depois preencha o miolo com cinza escuro translúcido.
+- Ícone (troque o assunto): *"Single game UI icon, polished 2D cartoon, thick dark outline, vibrant colors, simple bold shapes readable at 32 px, centered, fills 85 percent of the frame, flat solid magenta background: a small stone castle with three towers and a blue flag."*
+
 ## Spritesheets e animações
 
 - Só `monster_*` e os heróis (`hero_knight`… e `hero_body`/`hero_head`) aceitam spritesheet (tira de quadros iguais, lidos da esquerda pra direita, de cima pra baixo; quadro 0 = primeiro).

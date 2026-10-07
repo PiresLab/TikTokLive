@@ -41,6 +41,7 @@
       this.fx = new R.Fx(this, this.worldLayer, { kingdom: this.kingdom, monsters: this.monsters, heroes: this.heroes });
       this.weather = new R.Weather(this, this.worldLayer, this.fx);
       this.hud = new R.Hud(this, this.uiLayer);
+      this.fx.obstacles = () => this.hud.obstacles();
 
       this.firstState = true;
       this.eraTier = -1;
@@ -237,7 +238,7 @@
       switch (m.kind) {
         case 'levelUp': {
           const color = R.TITLE_COLORS[Math.min(R.TITLE_COLORS.length - 1, m.titleIndex)];
-          this.hud.toast({ icon: '⬆️', title: `${m.user.nickname} → Nível ${m.level}`, sub: m.title, color });
+          this.hud.toast({ icon: '⬆️', iconKey: 'ic_level', title: `${m.user.nickname} → Nível ${m.level}`, sub: m.title, color });
           this.heroes.update(m.user.userId, { level: m.level, titleIndex: m.titleIndex, classKey: m.classKey });
           const pos = this.heroes.positionOf(m.user.userId);
           if (pos) {
@@ -249,7 +250,7 @@
           break;
         }
         case 'mission':
-          this.hud.toast({ icon: '🎯', title: `${m.user.nickname}: missão cumprida`, sub: `${m.title} (+${m.xp} XP)`, color: 0x7cfc9a });
+          this.hud.toast({ icon: '🎯', iconKey: 'ic_target', title: `${m.user.nickname}: missão cumprida`, sub: `${m.title} (+${m.xp} XP)`, color: 0x7cfc9a });
           if (!quiet) Sound.follow();
           break;
         case 'achievement':

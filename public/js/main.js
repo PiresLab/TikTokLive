@@ -52,9 +52,23 @@
         this.fx.eraUp(this.kingdom.x, R.GROUND_Y - 150);
       };
       this.monsters.onDeath = (x, y, isBoss) => this.fx.monsterDied(x, y, isBoss);
-      this.monsters.onAttack = () => {
-        this.kingdom.shake(3);
-        this.fx.shake(120, 0.002);
+      this.monsters.strikeX = CASTLE_X + 235;
+      // ataque em 3 tempos: aviso (faíscas vermelhas) → investida → impacto (poeira, tremor; chefão racha a muralha)
+      this.monsters.onWindup = (x, y, isBoss) => {
+        this.fx.rise(x, y, 0xff5a3a, isBoss ? 18 : 8);
+      };
+      this.monsters.onImpact = (x, y, isBoss) => {
+        this.fx.smoke(x + 20, R.GROUND_Y + 4, isBoss ? 12 : 6);
+        this.fx.burst(x, R.GROUND_Y - 10, 0xd8c8a0, isBoss ? 18 : 8);
+        this.fx.shockwave(x, R.GROUND_Y, 0xd8c8a0, isBoss ? 2.2 : 1.2);
+        this.fx.shake(isBoss ? 260 : 120, isBoss ? 0.006 : 0.003);
+        this.kingdom.shake(isBoss ? 5 : 3);
+        this.heroes.hop();
+        if (isBoss) {
+          this.kingdom.crack();
+          this.hud.flashKingdom();
+          this.fx.hitStop(70);
+        }
       };
 
       // números de dano agregados (a cada ~220ms) a partir da queda de HP do monstro
@@ -170,16 +184,16 @@
     applyFx(e) {
       switch (e.type) {
         case 'like':
-          this.fx.fireLike(e.likeCount ?? 1);
+          this.fx.fireLike(e.likeCount ?? 1, e.heroClass, e.user.userId);
           break;
         case 'comment':
           this.hud.addFeed(`${this.levelTag(e)}${e.user.nickname}: ${R.truncate(e.comment, 40)}`, '#9fd3ff');
-          this.fx.fireComment();
+          this.fx.fireComment(e.heroClass, e.user.userId);
           break;
         case 'gift': {
           const tier = R.giftTier(e.totalDiamondValue ?? 0);
           this.hud.queueGift(e, tier);
-          this.fx.fireGift(tier);
+          this.fx.fireGift(tier, e.giftName);
           if (tier === R.GIFT_TIERS.high) Sound.giftHigh();
           else if (tier === R.GIFT_TIERS.mid) Sound.giftMedium();
           else Sound.giftLow();
@@ -251,6 +265,7 @@
     applyEventStarted(n) {
       const look = EVENT_BANNER[n.event];
       if (!look) return;
+      if (n.event === 'eliteBoss') this.nextBossElite = true;
       if (n.event !== 'eliteBoss') this.hud.banner(`${look.icon} ${n.name}`, R.hex(look.color), 2600, n.flavor);
       switch (n.event) {
         case 'bloodMoon':
@@ -286,20 +301,32 @@
           }
           break;
         }
-        case 'bossSpawned':
-          this.hud.banner(`⚠ CHEFÃO: ${n.name}!`, '#ffd166', 2000, 'Derrotem-no antes que o Reino caia');
+        case 'bossSpawned': {
+          // abertura de chefão: faixas de cinema, nome grande e câmera enquadrando o monstro entrando
+          const elite = this.nextBossElite;
+          this.nextBossElite = false;
+          this.hud.cinematic(
+            `⚠ ${n.name.toUpperCase()}`,
+            elite ? 'CHEFÃO ELITE BLINDADO — curtidas valem metade, comentários valem o dobro' : 'Derrotem-no antes que o Reino caia',
+            elite ? '#9fc8ff' : '#ffd166',
+          );
+          this.fx.focus(this.monsters.x, R.GROUND_Y - 120, 1.08, 1500);
           this.fx.bossSpawned();
           Sound.bossSpawned();
           break;
+        }
         case 'bossDefeated':
           this.hud.banner(`${n.name} foi derrotado!`, '#ffd166', 2000, n.by ? `🎉 Golpe final de ${n.by.nickname}!` : '🎉');
           this.fx.bossDefeated();
+          this.fx.hitStop(110);
+          this.fx.punchIn(1.07, 180);
           Sound.bossDefeated();
           break;
         case 'kingdomFall':
           this.hud.banner('O REINO CAIU!', '#ff6b6b', 2200, 'Reconstruindo...');
           this.kingdom.crumble();
           this.fx.kingdomFall();
+          this.fx.punchIn(1.04, 200);
           Sound.kingdomFall();
           this.time.delayedCall(2300, () => this.kingdom.rebuild());
           break;

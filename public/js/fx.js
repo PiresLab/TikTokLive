@@ -3,6 +3,20 @@
 // Tudo reaproveita objetos/emissores (sem alocação por frame) e respeita
 // R.fxScale (?lowfx=1) pra rodar leve 24/7.
 (function fx(R) {
+  /**
+   * Feitiço por presente (nome em pt/en, sem depender de id, que varia por região). Pra incluir um presente novo:
+   * adicione uma linha aqui. `cooldown` evita empilhar o mesmo feitiço em rajada; `alsoTier` soma o efeito do tier.
+   */
+  const GIFT_SPELLS = [
+    { match: /\b(rose|rosa)\b/i, cooldown: 350, cast: (fx) => fx.castRose(), alsoTier: true },
+    { match: /(heart|coraç|coraca|finger)/i, cooldown: 500, cast: (fx) => fx.castHeart(), alsoTier: true },
+    { match: /perfum/i, cooldown: 500, cast: (fx) => fx.castPerfume(), alsoTier: true },
+    { match: /^\s*(gg|good game)\s*$/i, cooldown: 600, cast: (fx) => fx.castGG(), alsoTier: true },
+    { match: /(lion|le[aã]o)/i, cooldown: 1200, cast: (fx) => fx.castLion(), alsoTier: true },
+    { match: /(galaxy|gal[aá]xia)/i, cooldown: 1500, cast: (fx) => fx.castGalaxy(), alsoTier: false },
+    { match: /(universe|universo)/i, cooldown: 2500, cast: (fx) => fx.castUniverse(), alsoTier: false },
+  ];
+
   class Fx {
     constructor(scene, layer, refs) {
       this.scene = scene;
@@ -17,6 +31,9 @@
       this.lastShareAt = 0;
       this.lastHighAt = -9999;
       this.lastMidAt = -9999;
+      this.lastSpellAt = -9999;
+      this.punching = false;
+      this.stopped = false;
     }
 
     /** Efeitos ficam acima de tudo (heróis usam depth = y, ~600). */
@@ -45,6 +62,14 @@
         smoke: {
           texture: 'glow',
           config: { speedY: { min: -60, max: -20 }, speedX: { min: -25, max: 25 }, lifespan: { min: 1200, max: 2200 }, scale: { start: 0.5, end: 1.4 }, alpha: { start: 0.5, end: 0 }, tint: color },
+        },
+        petal: {
+          texture: 'flake',
+          config: { speedX: { min: -60, max: 60 }, speedY: { min: 20, max: 90 }, gravityY: 70, lifespan: { min: 1500, max: 2300 }, scale: { start: 1.2, end: 0.5 }, alpha: { start: 1, end: 0 }, rotate: { min: 0, max: 360 }, tint: [0xff8fb3, 0xffb3c9, 0xff6f9c, 0xffd0dc] },
+        },
+        heart: {
+          texture: 'heart',
+          config: { speedY: { min: -130, max: -60 }, speedX: { min: -45, max: 45 }, lifespan: { min: 900, max: 1500 }, scale: { start: 0.35, end: 0.95 }, alpha: { start: 1, end: 0 }, tint: [0xff5a86, 0xff7aa5, 0xffa0bd] },
         },
         confetti: {
           texture: 'spark',
@@ -92,6 +117,65 @@
 
     flash(duration, r, g, b) {
       this.scene.cameras.main.flash(duration, r, g, b);
+    }
+
+    /** "Soco" de zoom: aproxima rápido e volta devagar (só no mundo; o HUD fica parado). */
+    punchIn(zoom = 1.05, ms = 150) {
+      if (R.lowfx || this.punching) return;
+      this.punching = true;
+      const cam = this.scene.cameras.main;
+      cam.zoomTo(zoom, ms, Phaser.Math.Easing.Sine.Out);
+      this.scene.time.delayedCall(ms, () => {
+        cam.zoomTo(1, ms * 3, Phaser.Math.Easing.Sine.InOut, true, (_c, progress) => {
+          if (progress >= 1) this.punching = false;
+        });
+      });
+    }
+
+    /** Congela o jogo por alguns ms no impacto (80–120 ms dá peso sem parecer travamento). */
+    hitStop(ms = 80) {
+      if (R.lowfx || this.stopped) return;
+      this.stopped = true;
+      const { scene } = this;
+      scene.time.timeScale = 0.05;
+      scene.tweens.timeScale = 0.05;
+      window.setTimeout(() => {
+        scene.time.timeScale = 1;
+        scene.tweens.timeScale = 1;
+        this.stopped = false;
+      }, ms);
+    }
+
+    /** Enquadra (pan + zoom) um ponto por um tempo e volta ao normal: abertura de chefão. */
+    focus(x, y, zoom = 1.1, hold = 1500) {
+      if (R.lowfx) return;
+      const cam = this.scene.cameras.main;
+      // com zoom a câmera mostra só W/zoom x H/zoom: o centro não pode passar disso senão aparece borda preta fora do cenário
+      const halfW = R.W / (2 * zoom);
+      const halfH = R.H / (2 * zoom);
+      x = Math.min(R.W - halfW, Math.max(halfW, x));
+      y = Math.min(R.H - halfH, Math.max(halfH, y));
+      cam.pan(x, y, 450, Phaser.Math.Easing.Sine.InOut, true);
+      cam.zoomTo(zoom, 450, Phaser.Math.Easing.Sine.InOut, true);
+      this.scene.time.delayedCall(450 + hold, () => {
+        cam.pan(R.W / 2, R.H / 2, 600, Phaser.Math.Easing.Sine.InOut, true);
+        cam.zoomTo(1, 600, Phaser.Math.Easing.Sine.InOut, true);
+      });
+    }
+
+    /** Traço rápido de lâmina (guerreiro): linha clara que aparece e some. */
+    slash(x, y, color) {
+      const line = this.scene.add.image(x, y, 'px').setTint(color).setBlendMode('ADD').setDisplaySize(70, 4).setRotation(R.rand(-0.9, 0.9)).setAlpha(0.95);
+      this.addTop(line);
+      this.scene.tweens.add({ targets: line, alpha: 0, scaleX: line.scaleX * 1.5, duration: 160, onComplete: () => line.destroy() });
+    }
+
+    petals(x, y, count) {
+      this.emitterFor(0, 'petal').explode(this.scaled(count), x, y);
+    }
+
+    hearts(x, y, count) {
+      this.emitterFor(0, 'heart').explode(this.scaled(count), x, y);
     }
 
     // ---------------------------------------------------------------- projéteis
@@ -175,42 +259,69 @@
       return { x: c.x + R.rand(-spread, spread), y: c.y + R.rand(-spread, spread) };
     }
 
-    sourcePoint() {
+    sourcePoint(userId) {
+      const hero = userId ? this.refs.heroes.positionOf(userId) : null;
+      if (hero) return { x: hero.x + 12 + R.rand(-4, 4), y: hero.y - R.HERO_SIZE.h * 0.55 + R.rand(-6, 6) };
       const m = this.refs.kingdom.muzzle();
       return { x: m.x + R.rand(-30, 30), y: m.y + R.rand(-40, 20) };
     }
 
     // ---------------------------------------------------------------- eventos de viewer
 
+    /** Arma de cada classe: textura, cor, voo e o que acontece no impacto. */
+    classShot(classKey) {
+      const shots = {
+        knight: { texture: 'spark', tint: 0xbfe6ff, scale: 0.75, duration: [160, 230], arc: [20, 50], hit: (x, y) => { this.slash(x, y, 0xdff3ff); this.burst(x, y, 0x9fd0ff, 5); } },
+        archer: { texture: 'arrow', tint: 0xe8f4d0, scale: 0.8, normal: true, rotate: true, duration: [190, 270], arc: [30, 70], hit: (x, y) => this.burst(x, y, 0xd8f0b0, 4) },
+        mage: { texture: 'glow', tint: 0xb08cff, scale: 0.45, trail: true, duration: [230, 320], arc: [50, 100], hit: (x, y) => { this.burst(x, y, 0xb08cff, 8); this.shockwave(x, y, 0xb08cff, 0.7); } },
+        guardian: { texture: 'spark', tint: 0xffe08a, scale: 0.8, duration: [200, 280], arc: [40, 80], hit: (x, y) => { this.burst(x, y, 0xffe08a, 6); this.rise(x, y, 0xffe08a, 3); } },
+      };
+      return shots[classKey] ?? null;
+    }
+
+    /** Um disparo de curtida/comentário: sai do próprio herói (se estiver na tela) com o estilo da classe dele. */
+    shoot(classKey, userId, { slow = 1, delay = 0, count = 1 } = {}) {
+      const style = this.classShot(classKey);
+      const hit = (x, y, fallback) => {
+        this.refs.monsters.hit();
+        if (style) style.hit(x, y);
+        else fallback(x, y);
+      };
+      for (let i = 0; i < count; i += 1) {
+        this.fire({
+          from: this.sourcePoint(userId),
+          to: this.targetPoint(),
+          texture: style?.texture ?? 'spark',
+          tint: style?.tint ?? 0x9fe8ff,
+          scale: style?.scale ?? 0.55,
+          normal: style?.normal,
+          rotate: style?.rotate,
+          trail: style?.trail,
+          duration: R.rand(...(style?.duration ?? [170, 250])) * slow,
+          delay: delay + i * 70,
+          arc: R.rand(...(style?.arc ?? [30, 80])),
+          onHit: (x, y) => hit(x, y, (px, py) => this.burst(px, py, 0x9fe8ff, 5)),
+        });
+      }
+    }
+
     /** Lote grande de curtidas (o TikTok manda agrupado) vira até 3 disparos escalonados, não 1. */
-    fireLike(count = 1) {
+    fireLike(count = 1, classKey, userId) {
       const now = this.scene.time.now;
       if (now - this.lastLikeAt < 120) return;
       this.lastLikeAt = now;
-      const shots = Math.min(3, Math.max(1, Math.ceil(count / 4)));
-      for (let i = 0; i < shots; i += 1) {
-        this.fire({
-          from: this.sourcePoint(),
-          to: this.targetPoint(),
-          texture: 'spark',
-          tint: 0x9fe8ff,
-          scale: 0.55,
-          duration: R.rand(170, 250),
-          delay: i * 70,
-          arc: R.rand(30, 80),
-          onHit: (x, y) => {
-            this.refs.monsters.hit();
-            this.burst(x, y, 0x9fe8ff, 5);
-          },
-        });
-      }
+      this.shoot(classKey, userId, { count: Math.min(3, Math.max(1, Math.ceil(count / 4))) });
       if (Math.random() < 0.25) this.refs.heroes.hop();
     }
 
-    fireComment() {
+    fireComment(classKey, userId) {
       const now = this.scene.time.now;
       if (now - this.lastCommentAt < 220) return;
       this.lastCommentAt = now;
+      if (classKey) {
+        this.shoot(classKey, userId, { slow: 1.25 });
+        return;
+      }
       this.fire({
         from: this.sourcePoint(),
         to: this.targetPoint(),
@@ -253,9 +364,95 @@
       this.refs.heroes.hop();
     }
 
-    fireGift(requestedTier) {
+    /** Feitiços por presente conhecido (pelo nome, em pt/en); presente desconhecido usa o feitiço do tier. */
+    spellFor(giftName) {
+      if (!giftName) return null;
+      return GIFT_SPELLS.find((spell) => spell.match.test(giftName)) ?? null;
+    }
+
+    castRose() {
+      const t = this.refs.monsters.center();
+      this.petals(t.x, t.y - 230, 26);
+      this.petals(this.refs.kingdom.x + 60, R.GROUND_Y - 280, 14);
+      this.refs.heroes.hop();
+    }
+
+    castHeart() {
+      const spots = this.refs.heroes.positions(4);
+      if (spots.length === 0) spots.push({ x: this.refs.kingdom.x + 60, y: R.GROUND_Y });
+      spots.forEach((p) => this.hearts(p.x, p.y - 60, 5));
+    }
+
+    castPerfume() {
+      const k = this.refs.kingdom;
+      this.shockwave(k.x + 20, R.GROUND_Y - 40, 0xd9a8ff, 3);
+      this.rise(k.x + 20, R.GROUND_Y - 40, 0xd9a8ff, 30);
+      this.refs.heroes.positions(5).forEach((p) => this.rise(p.x, p.y - 20, 0xffc2e8, 6));
+    }
+
+    castGG() {
+      this.floatText(R.W / 2, R.GROUND_Y - 320, 'GG!', { color: '#ffd166', size: 52, duration: 1400, rise: 80 });
+      this.confetti(R.W / 2, R.GROUND_Y - 40, 40);
+    }
+
+    castLion() {
+      const t = this.refs.monsters.center();
+      this.flash(260, 255, 214, 120);
+      [0, 140, 290].forEach((delay, i) =>
+        this.scene.time.delayedCall(delay, () => {
+          this.shockwave(t.x, t.y, i % 2 ? 0xffb04a : 0xffe08a, 3 + i * 1.2);
+          this.shake(300, 0.008);
+        }),
+      );
+      this.burst(t.x, t.y, 0xffd166, 40);
+      this.floatText(t.x, t.y - 150, 'ROAR!', { color: '#ffd166', size: 44, duration: 1300, rise: 70 });
+      this.punchIn(1.05);
+      this.refs.monsters.hit();
+    }
+
+    /** Chuva de estrelas por toda a tela, em cima do raio+meteoros padrão. */
+    castGalaxy() {
+      this.castHigh();
+      this.flash(400, 150, 90, 255);
+      for (let i = 0; i < Math.round(26 * R.fxScale); i += 1) {
+        this.fire({
+          from: { x: R.rand(0, R.W), y: -40 },
+          to: { x: R.rand(0, R.W), y: R.GROUND_Y - R.rand(0, 120) },
+          texture: 'spark',
+          tint: i % 2 ? 0xc59bff : 0x9fd0ff,
+          scale: R.rand(0.6, 1.1),
+          duration: R.rand(700, 1100),
+          delay: R.rand(0, 700),
+          arc: 0,
+          force: true,
+          onHit: (x, y) => this.burst(x, y, 0xc59bff, 4),
+        });
+      }
+      this.punchIn(1.06, 200);
+    }
+
+    /** O feitiço máximo: clarão total, raios extras, hit-stop e zoom. */
+    castUniverse() {
+      this.castGalaxy();
+      this.flash(650, 255, 255, 255);
+      [250, 500].forEach((delay) => this.scene.time.delayedCall(delay, () => this.lightning(R.rand(R.W * 0.2, R.W * 0.8), R.GROUND_Y - 20)));
+      this.floatText(R.W / 2, R.GROUND_Y - 360, 'UNIVERSO!', { color: '#ffffff', size: 54, duration: 1700, rise: 90 });
+      this.hitStop(100);
+      this.punchIn(1.09, 220);
+    }
+
+    fireGift(requestedTier, giftName) {
       const monsters = this.refs.monsters;
       const now = this.scene.time.now;
+
+      // feitiço do presente (se conhecido); presentes em sequência caem no efeito do tier pra não empilhar
+      const spell = this.spellFor(giftName);
+      if (spell && now - this.lastSpellAt >= spell.cooldown) {
+        this.lastSpellAt = now;
+        spell.cast(this);
+        if (!spell.alsoTier) return;
+      }
+
       let tier = requestedTier;
       // tempestade de raio+meteoros no máximo a cada 1,2s; gifts altos seguidos viram cometa
       if (tier === R.GIFT_TIERS.high) {
@@ -312,7 +509,13 @@
         return;
       }
 
+      this.castHigh();
+    }
+
+    /** Raio + chuva de meteoros + flash/shake: o feitiço padrão dos presentes caros. */
+    castHigh() {
       // alto: raio + chuva de meteoros + flash/shake
+      const monsters = this.refs.monsters;
       const target = monsters.center();
       this.lightning(target.x, target.y);
       for (let i = 0; i < 6; i += 1) {
@@ -340,6 +543,7 @@
         this.flash(380, 255, 214, 120);
         this.shake(520, 0.012);
         this.floatText(target.x, target.y - 140, 'CRÍTICO!', { color: '#ffd166', size: 38, duration: 1300 });
+        this.punchIn(1.04);
       });
     }
 

@@ -58,6 +58,16 @@ window.Reino = window.Reino || {};
   /** 1 = tudo; <1 reduz partículas/estrelas pra máquinas fracas. */
   R.fxScale = R.lowfx ? 0.4 : 1;
 
+  /** Estilo único do HUD (painéis, barras, avisos): mude aqui e tudo acompanha. */
+  R.TOKENS = {
+    radius: 14,
+    panelFill: 0x0e1430,
+    panelAlpha: 0.78,
+    border: 0x3a4a86,
+    shadowAlpha: 0.28,
+    cinemaBar: 0x05060d,
+  };
+
   R.FONT = '"Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif';
 
   R.hex = (n) => `#${n.toString(16).padStart(6, '0')}`;

@@ -25,14 +25,16 @@
   });
 
   function panel(g, x, y, w, h, o = {}) {
-    g.fillStyle(0x000000, 0.28);
-    g.fillRoundedRect(x + 2, y + 4, w, h, o.radius ?? 14);
-    g.fillStyle(o.fill ?? 0x0e1430, o.alpha ?? 0.78);
-    g.fillRoundedRect(x, y, w, h, o.radius ?? 14);
+    const T = R.TOKENS;
+    const radius = o.radius ?? T.radius;
+    g.fillStyle(0x000000, T.shadowAlpha);
+    g.fillRoundedRect(x + 2, y + 4, w, h, radius);
+    g.fillStyle(o.fill ?? T.panelFill, o.alpha ?? T.panelAlpha);
+    g.fillRoundedRect(x, y, w, h, radius);
     g.fillStyle(0xffffff, 0.05);
-    g.fillRoundedRect(x, y, w, Math.min(h / 2, 26), { tl: o.radius ?? 14, tr: o.radius ?? 14, bl: 0, br: 0 });
-    g.lineStyle(2, o.border ?? 0x3a4a86, 0.9);
-    g.strokeRoundedRect(x, y, w, h, o.radius ?? 14);
+    g.fillRoundedRect(x, y, w, Math.min(h / 2, 26), { tl: radius, tr: radius, bl: 0, br: 0 });
+    g.lineStyle(2, o.border ?? T.border, 0.9);
+    g.strokeRoundedRect(x, y, w, h, radius);
   }
 
   function bar(g, x, y, w, h, ratio, topColor, bottomColor) {
@@ -202,6 +204,45 @@
             },
           });
         },
+      });
+    }
+
+    /** Pancada no castelo: o painel do Reino pisca. */
+    flashKingdom() {
+      this.scene.tweens.add({ targets: [this.leftBg, this.kBar], alpha: { from: 0.25, to: 1 }, duration: 110, yoyo: true, repeat: 2 });
+    }
+
+    /** Abertura de chefão: faixas de cinema entram, o nome aparece grande e tudo sai. */
+    cinematic(title, sub = '', color = '#ffd166', hold = 1700) {
+      const s = this.scene;
+      const barH = Math.round(R.H * 0.1);
+      const mk = (y) => this.add(s.add.image(0, y, 'px').setOrigin(0, 0).setDisplaySize(R.W, barH).setTint(R.TOKENS.cinemaBar).setAlpha(0.94));
+      const top = mk(-barH);
+      const bottom = mk(R.H);
+      const bk = R.vertical ? 1.25 : 1;
+      const name = this.add(
+        s.add
+          .text(R.W / 2, R.vertical ? 800 : 300, title, TEXT({ fontSize: `${Math.round(50 * bk)}px`, fontStyle: 'bold', color, strokeThickness: 8, align: 'center', wordWrap: { width: R.W - 60 } }))
+          .setOrigin(0.5)
+          .setAlpha(0)
+          .setScale(1.25),
+      );
+      const subText = this.add(
+        s.add.text(R.W / 2, (R.vertical ? 800 : 300) + 58 * bk, sub, TEXT({ fontSize: `${Math.round(20 * bk)}px`, color: '#eaf0ff', strokeThickness: 4, align: 'center' })).setOrigin(0.5, 0).setAlpha(0),
+      );
+      s.tweens.add({ targets: top, y: 0, duration: 340, ease: 'Cubic.Out' });
+      s.tweens.add({ targets: bottom, y: R.H - barH, duration: 340, ease: 'Cubic.Out' });
+      s.tweens.add({ targets: name, alpha: 1, scale: 1, duration: 420, delay: 260, ease: 'Cubic.Out' });
+      s.tweens.add({ targets: subText, alpha: 1, duration: 360, delay: 520 });
+      s.time.delayedCall(340 + hold, () => {
+        s.tweens.add({ targets: top, y: -barH, duration: 380, ease: 'Cubic.In' });
+        s.tweens.add({ targets: bottom, y: R.H, duration: 380, ease: 'Cubic.In' });
+        s.tweens.add({
+          targets: [name, subText],
+          alpha: 0,
+          duration: 380,
+          onComplete: () => [top, bottom, name, subText].forEach((o) => o.destroy()),
+        });
       });
     }
 

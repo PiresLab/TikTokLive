@@ -628,6 +628,16 @@
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, 12, 12);
     });
+    ensureCanvas(scene, 'heart', 32, 30, (ctx) => {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(16, 28);
+      ctx.bezierCurveTo(2, 18, 0, 8, 7, 4);
+      ctx.bezierCurveTo(12, 1, 16, 6, 16, 9);
+      ctx.bezierCurveTo(16, 6, 20, 1, 25, 4);
+      ctx.bezierCurveTo(32, 8, 30, 18, 16, 28);
+      ctx.fill();
+    });
     ensureCanvas(scene, 'fog', 512, 160, (ctx) => {
       ctx.save();
       ctx.scale(1, 160 / 512);

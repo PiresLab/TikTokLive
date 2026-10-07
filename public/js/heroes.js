@@ -179,6 +179,12 @@
       this.applyMeta(hero, meta);
     }
 
+    /** Até `n` heróis aleatórios na tela (pra feitiços que saem dos heróis). */
+    positions(n) {
+      const keys = [...this.order].sort(() => Math.random() - 0.5).slice(0, n);
+      return keys.map((k) => this.positionOf(k)).filter(Boolean);
+    }
+
     /** Posição atual na tela (pra efeitos de subida de nível). Null se o herói não está visível. */
     positionOf(key) {
       const hero = this.map.get(key);

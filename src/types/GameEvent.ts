@@ -24,6 +24,8 @@ export interface GameEvent {
 
   /** Nível de progressão de quem causou o evento (preenchido ao transmitir pro client; não vem do TikTok). */
   level?: number;
+  /** Classe do herói de quem causou o evento (guerreiro/arqueiro/mago/guardião): define o estilo do projétil no client. */
+  heroClass?: 'knight' | 'archer' | 'mage' | 'guardian';
 
   /** like: curtidas no lote recebido */
   likeCount?: number;

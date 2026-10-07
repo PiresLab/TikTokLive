@@ -133,6 +133,14 @@ describe('ProgressionService', () => {
     expect(messages.filter((m) => m.kind === 'achievement' && (m as { id: string }).id === 'first_follow')).toHaveLength(1);
   });
 
+  it('tracks the hero class as the player changes what they do', () => {
+    expect(service.classOf('ghost')).toBe('knight');
+    feed(ev('follow'));
+    expect(service.classOf('u1')).toBe('guardian');
+    for (let i = 0; i < 40; i += 1) feed(ev('comment', { comment: 'oi' }));
+    expect(service.classOf('u1')).toBe('archer');
+  });
+
   it('emits levelUp once when xp crosses a level and reports the class', () => {
     feed(ev('gift', { totalDiamondValue: 400 })); // 400 xp = nível 5 (Soldado)
     const level = messages.find((m) => m.kind === 'levelUp');

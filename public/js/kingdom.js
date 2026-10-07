@@ -173,6 +173,37 @@
       this.decor.forEach((d) => d.setVisible(false));
     }
 
+    /** Pancada na muralha: rachadura que some em ~3 s e o castelo pisca vermelho. */
+    crack() {
+      if (!this.sprite || this.crumbling) return;
+      const g = this.scene.add.graphics();
+      this.layer.add(g);
+      let x = this.x + 110 + R.rand(-30, 25);
+      let y = this.groundY - R.rand(80, 200);
+      const branch = { x, y };
+      g.lineStyle(3.5, 0x14101c, 0.92);
+      g.beginPath();
+      g.moveTo(x, y);
+      for (let i = 0; i < 7; i += 1) {
+        x += R.rand(-14, 14);
+        y += R.rand(10, 22);
+        g.lineTo(x, y);
+        if (i === 2) {
+          branch.x = x;
+          branch.y = y;
+        }
+      }
+      g.strokePath();
+      g.lineStyle(2.5, 0x14101c, 0.85);
+      g.beginPath();
+      g.moveTo(branch.x, branch.y);
+      g.lineTo(branch.x + R.rand(14, 30), branch.y + R.rand(6, 16));
+      g.lineTo(branch.x + R.rand(26, 44), branch.y + R.rand(20, 34));
+      g.strokePath();
+      this.scene.tweens.add({ targets: g, alpha: 0, delay: 2200, duration: 1200, onComplete: () => g.destroy() });
+      this.flashUntil = this.scene.time.now + 220;
+    }
+
     rebuild() {
       if (!this.sprite) return;
       this.crumbling = false;
@@ -184,6 +215,16 @@
 
     update(time) {
       if (!this.sprite || this.crumbling) return;
+      if (this.flashUntil && time < this.flashUntil) {
+        this.sprite.setTint(0xff8f8f);
+        this.flashing = true;
+        return;
+      }
+      if (this.flashing) {
+        this.flashing = false;
+        this.sprite.clearTint();
+        this.tinted = false;
+      }
       if (this.hpRatio < 0.25) {
         const pulse = (Math.sin(time / 170) + 1) / 2;
         this.sprite.setTint(R.lerpColor(0xffffff, 0xff6a6a, 0.25 + pulse * 0.55));

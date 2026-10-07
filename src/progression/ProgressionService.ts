@@ -63,6 +63,7 @@ function localDate(): string {
  */
 export class ProgressionService extends EventEmitter {
   private readonly levels = new Map<string, number>();
+  private readonly classes = new Map<string, HeroClass>();
   private lastPrunedDay = -1;
   private readonly today: () => string;
 
@@ -81,6 +82,16 @@ export class ProgressionService extends EventEmitter {
     const level = levelForXp(this.db.getProgress(userId)?.xp ?? 0).level;
     this.levels.set(userId, level);
     return level;
+  }
+
+  /** Classe do herói (cache; cai no banco na primeira consulta). Quem nunca apareceu é Guerreiro. */
+  classOf(userId: string): HeroClass {
+    const cached = this.classes.get(userId);
+    if (cached) return cached;
+    const progress = this.db.getProgress(userId);
+    const classKey = progress ? classFor(progress) : 'knight';
+    this.classes.set(userId, classKey);
+    return classKey;
   }
 
   handleEvent(event: GameEvent): void {
@@ -125,6 +136,7 @@ export class ProgressionService extends EventEmitter {
   resetAll(): void {
     this.db.resetProgress();
     this.levels.clear();
+    this.classes.clear();
   }
 
   getProfile(userId: string): ProfileCard | null {
@@ -192,6 +204,7 @@ export class ProgressionService extends EventEmitter {
     const before = levelForXp(xpBefore).level;
     const after = levelForXp(progress.xp);
     this.levels.set(user.userId, after.level);
+    this.classes.set(user.userId, classFor(progress));
 
     if (after.level > before) {
       this.emit('progress', {

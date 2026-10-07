@@ -15,8 +15,12 @@
       this.lungeTimer = null;
       /** callback(x, y, isBoss) quando um monstro morre */
       this.onDeath = null;
-      /** callback() quando o monstro ataca a muralha */
-      this.onAttack = null;
+      /** callback(x, y, isBoss) quando o monstro começa a se preparar pra atacar */
+      this.onWindup = null;
+      /** callback(x, y, isBoss) no momento do impacto (só o chefão chega até a muralha) */
+      this.onImpact = null;
+      /** x até onde o chefão investe (a muralha); main ajusta */
+      this.strikeX = x - 250;
     }
 
     center() {
@@ -159,18 +163,58 @@
       });
     }
 
+    /**
+     * Ataque em 3 tempos: antecipação (recua, fica vermelho e a tela avisa), investida
+     * (chefão chega até a muralha; monstro comum avança metade) e impacto (poeira, rachadura,
+     * tremor), depois volta. Puramente visual: o dano ao Reino continua sendo o cerco passivo.
+     */
     lunge() {
       const cur = this.current;
-      if (!cur || cur.walking) return;
-      R.playOnce(this.scene, cur.sprite, cur.textureKey, 'attack');
-      this.scene.tweens.add({
-        targets: cur.container,
-        x: this.x - 70,
-        duration: 170,
-        yoyo: true,
-        ease: 'Quad.Out',
-        onYoyo: () => {
-          if (this.onAttack) this.onAttack();
+      if (!cur || cur.walking || cur.attacking) return;
+      cur.attacking = true;
+      const { scene } = this;
+      const { container, sprite } = cur;
+      const boss = cur.isBoss;
+      const reach = (this.x - this.strikeX) * (boss ? 1 : 0.55);
+      const windup = boss ? 560 : 380;
+      const alive = () => this.current === cur && container.active;
+
+      if (this.onWindup) this.onWindup(container.x, this.groundY - cur.size * 0.5, boss);
+      R.playOnce(scene, sprite, cur.textureKey, 'attack');
+
+      // 1. antecipação: recua um pouco, agacha e esquenta a cor
+      scene.tweens.add({ targets: container, x: this.x + (boss ? 26 : 16), duration: windup, ease: 'Sine.Out' });
+      scene.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: windup,
+        onUpdate: (tween) => alive() && sprite.setTint(R.lerpColor(0xffffff, 0xff6a4a, tween.getValue())),
+        onComplete: () => {
+          if (!alive()) return;
+          sprite.clearTint();
+
+          // 2. investida
+          scene.tweens.add({
+            targets: container,
+            x: this.x - reach,
+            duration: boss ? 210 : 170,
+            ease: 'Quad.In',
+            onComplete: () => {
+              if (!alive()) return;
+
+              // 3. impacto e volta
+              if (this.onImpact) this.onImpact(container.x - 30, this.groundY, boss);
+              scene.tweens.add({
+                targets: container,
+                x: this.x,
+                duration: 420,
+                ease: 'Sine.InOut',
+                onComplete: () => {
+                  cur.attacking = false;
+                },
+              });
+            },
+          });
         },
       });
     }
@@ -212,6 +256,7 @@
       const cx = container.x;
       const cy = this.groundY - cur.size * 0.5;
       this.scene.tweens.killTweensOf(cur.sprite);
+      this.scene.tweens.killTweensOf(container);
       if (cur.aura) this.scene.tweens.killTweensOf(cur.aura);
       if (cur.shield) this.scene.tweens.killTweensOf(cur.shield);
       cur.extras.forEach((e) => this.scene.tweens.killTweensOf(e));

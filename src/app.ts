@@ -113,7 +113,7 @@ export function createApp(config: AppConfig): App {
       recordUserStat(db, event);
       progression.handleEvent(event);
     }
-    ws.broadcast({ type: 'fx', payload: event.isTest ? event : { ...event, level: progression.levelOf(event.user.userId) } });
+    ws.broadcast({ type: 'fx', payload: event.isTest ? event : { ...event, level: progression.levelOf(event.user.userId), heroClass: progression.classOf(event.user.userId) } });
     log.event(event);
     if (!event.isTest && event.type === 'comment' && PROFILE_COMMAND.test(event.comment ?? '')) sendProfile(event.user.userId);
   });

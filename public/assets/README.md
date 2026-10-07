@@ -44,7 +44,7 @@ Cada imagem pode ter **qualquer resolução**: o jogo a exibe no **tamanho lógi
 | `hero_body` | 40×64 | 80×128 | Pintado com a cor do herói (hash do nome): desenhe em branco/cinza claro. |
 | `hero_head` | 20×20 | 40×40 | Cabeça, sem tinta. |
 | `mountain_far`, `mountain_near` | 1280×240 | 2560×480 | **Telha horizontal**: repete (parallax), então a borda esquerda tem que emendar com a direita. Funciona em horizontal e vertical. Pintadas pela cor da Era: use branco/cinza. |
-| `ground` | 1280 × (altura do chão) | — | Também repete na horizontal e recebe a cor da Era. A altura lógica é **185** no horizontal e **720** no vertical (a imagem é esticada na vertical até lá): faça o topo com a grama e deixe a parte de baixo lisa. |
+| `ground` | 1280×185 | 2560×370 | **Telha horizontal** que repete e recebe a cor da Era. Faça a grama no topo e a terra embaixo. No vertical, abaixo da telha o jogo continua o chão com um degradê (escurecendo) calculado a partir do tom da borda de baixo da sua imagem, então a borda de baixo deve ser terra lisa. |
 | `glow` `spark` `star` `ring` `flag` `arrow` `vignette` `px` | vários | — | Texturas de efeito (brilho, faísca, estrela, onda de choque, bandeira, flecha, vinheta do chefão). Brancas: o jogo aplica a cor. Mantenha o tamanho original. |
 
 ## Spritesheets e animações

@@ -85,6 +85,18 @@
       );
       layer.add(this.groundTiles);
 
+      // vertical: abaixo da telha do chão a terra continua escurecendo até o fim da tela.
+      // O tom de partida vem do próprio pixel de baixo da textura (serve pra arte procedural e pra arte nova).
+      const fillTop = R.GROUND_Y - 6 + R.GROUND_TILE_H - 1;
+      this.groundFill = null;
+      if (fillTop < R.H) {
+        this.groundFill = scene.add.image(0, fillTop, 'px').setOrigin(0, 0).setDisplaySize(R.W, R.H - fillTop);
+        layer.add(this.groundFill);
+        const samples = [0.1, 0.3, 0.5, 0.7, 0.9].map((u) => scene.textures.getPixel(Math.floor(u * (scene.textures.getFrame('ground').width - 1)), scene.textures.getFrame('ground').height - 1, 'ground'));
+        const lum = samples.reduce((sum, c) => sum + (c ? (c.red + c.green + c.blue) / 765 : 0.5), 0) / samples.length;
+        this.groundFillLum = lum;
+      }
+
       // vinheta vermelha do chefão
       this.vignette = scene.add.image(0, 0, 'vignette').setOrigin(0, 0).setDisplaySize(R.W, R.H).setTint(0xff1a3a).setAlpha(0);
       layer.add(this.vignette);
@@ -165,7 +177,13 @@
       this.skyFill.setTint(bottom);
       this.far.setTint(dark(R.lerpColor(mix('far'), bottom, this.sunT * 0.3)));
       this.near.setTint(dark(mix('near')));
-      this.groundTiles.forEach((tile) => tile.setTint(dark(mix('ground'))));
+      const groundColor = dark(mix('ground'));
+      this.groundTiles.forEach((tile) => tile.setTint(groundColor));
+      if (this.groundFill) {
+        const topColor = R.lerpColor(groundColor, 0x000000, 1 - this.groundFillLum);
+        const bottomColor = R.lerpColor(groundColor, 0x000000, 1 - this.groundFillLum * 0.5);
+        this.groundFill.setTint(topColor, topColor, bottomColor, bottomColor);
+      }
       this.vignette.setAlpha(this.bossT * 0.55);
       this.moonGlow.setAlpha(0.35 * (1 - this.sunT * 0.8));
       this.dirty = false;

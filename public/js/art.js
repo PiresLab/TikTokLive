@@ -525,7 +525,7 @@
     if (key === 'hero_body') return { w: 40, h: 64 };
     if (key === 'hero_head') return { w: 20, h: 20 };
     if (key === 'mountain_far' || key === 'mountain_near') return { w: R.TILE_W, h: 240 };
-    if (key === 'ground') return { w: R.TILE_W, h: R.H - R.GROUND_Y + 40 };
+    if (key === 'ground') return { w: R.TILE_W, h: R.GROUND_TILE_H };
     return null;
   };
 
@@ -668,7 +668,7 @@
     ridge('mountain_far', 120, [34, 16, 6], [0.3, 1.7, 0.4], 0.95);
     ridge('mountain_near', 150, [28, 14, 8], [2.1, 0.6, 1.3], 1);
 
-    ensureCanvas(scene, 'ground', R.TILE_W, R.H - R.GROUND_Y + 40, (ctx, w, h) => {
+    ensureCanvas(scene, 'ground', R.TILE_W, R.GROUND_TILE_H, (ctx, w, h) => {
       const grd = ctx.createLinearGradient(0, 0, 0, h);
       grd.addColorStop(0, '#ffffff');
       grd.addColorStop(0.08, '#d6d6d6');

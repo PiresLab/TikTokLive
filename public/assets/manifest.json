@@ -13,7 +13,12 @@
     "monster_titan": "monster_titan.png",
     "monster_troll": "monster_troll.png",
     "monster_wolf": "monster_wolf.png",
-    "monster_wraith": "monster_wraith.png"
+    "monster_wraith": "monster_wraith.png",
+    "mountain_far": "mountain_far.png",
+    "mountain_near": "mountain_near.png",
+    "ground": "ground.png",
+    "hero_body": "hero_body.png",
+    "hero_head": "hero_head.png"
   },
   "anchors": {
     "castle_tier2": {

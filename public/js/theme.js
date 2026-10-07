@@ -37,6 +37,8 @@ window.Reino = window.Reino || {};
 
   /** Largura lógica de uma "telha" de fundo (montanhas/chão): repete na horizontal e cobre qualquer R.W. */
   R.TILE_W = 1280;
+  /** Altura lógica da telha do chão; no vertical o que sobra até o fim da tela é preenchido por degradê (background.js). */
+  R.GROUND_TILE_H = Math.min(185, R.H - R.GROUND_Y + 40);
   /** Spritesheets declarados no manifest: { chave: { frameWidth, frameHeight, anims } } — preenchido em boot.js. */
   R.SHEETS = {};
   /** Supersampling dos textos (renderizados em 2x e reduzidos): bordas nítidas em qualquer escala. */

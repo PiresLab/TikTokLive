@@ -64,8 +64,23 @@ Mantenha **todas** as peças consistentes entre si:
 - Fundo **transparente** em castelos, monstros e heróis; sem sombra projetada embutida (o jogo desenha a sua).
 - Monstros de perfil, olhando pra esquerda; formas grandes e legíveis (a tela é vista no celular).
 
+## Âncoras do castelo (bandeiras, tochas, fogueira)
+
+Bandeiras, tochas e fogueira são desenhadas **por cima** do castelo. Pra arte nova, declare onde ficam no `manifest.json`, em pixels **lógicos** da textura de 440×420 (a base do castelo está em y=416; arte 2x: divida as coordenadas do arquivo por 2):
+
+```json
+"anchors": {
+  "castle_tier2": {
+    "flags":   [{ "x": 84, "y": 64 }, { "x": 220, "y": 50 }],
+    "torches": [{ "x": 132, "y": 360 }],
+    "fire":    { "x": 220, "y": 386 }
+  }
+}
+```
+
+`flags` = topo do mastro (a bandeira pende pra direita), `torches` = luz tremeluzindo, `fire` = fogueira. Todos opcionais; sem `anchors` o castelo usa as posições do desenho procedural.
+
 ## Atenção
 
-- Bandeiras, tochas e fogueira são desenhadas **por cima** do castelo em posições fixas (`R.CASTLE_ANCHORS` em `public/js/art.js`, em coordenadas lógicas 440×420). Se a silhueta do seu castelo for outra, ajuste essas âncoras.
 - Imagens são carregadas uma vez no início: mantenha PNGs leves (o jogo roda 24/7).
 - `?lowfx=1` na URL reduz estrelas, partículas e parallax (máquina fraca). `?era=0..4` força o visual de uma Era (pra ajustar arte). `?vertical=1` mostra o layout 1080×1920.

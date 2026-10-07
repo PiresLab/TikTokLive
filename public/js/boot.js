@@ -1,7 +1,8 @@
 // Arte opcional: `assets/manifest.json` pode listar
 //   { "images": { chave: "arquivo.png" },
 //     "spritesheets": { chave: { "file": "x.png", "frameWidth": 190, "frameHeight": 190,
-//                                "anims": { "idle": { "frames": [0,1,2,3], "frameRate": 8 }, "attack": {...}, "hit": {...} } } } }
+//                                "anims": { "idle": { "frames": [0,1,2,3], "frameRate": 8 }, "attack": {...}, "hit": {...} } } },
+//     "anchors": { "castle_tier2": { "flags": [{x,y}], "torches": [{x,y}], "fire": {x,y} } } }
 // Cada imagem SUBSTITUI a arte procedural da mesma chave (art.js só desenha o que
 // ainda não existe como textura). A imagem pode ter qualquer resolução (2x, 3x...):
 // é exibida no tamanho lógico de R.sizeOf(chave). Sem manifest/arquivos, 100% procedural.
@@ -15,6 +16,19 @@
       const images = data && typeof data.images === 'object' && data.images ? data.images : {};
       for (const [textureKey, file] of Object.entries(images)) {
         if (typeof file === 'string') scene.load.image(textureKey, file);
+      }
+
+      // âncoras do castelo (bandeiras/tochas/fogueira) em px lógicos da textura 440x420, base em y=416
+      const anchors = data && typeof data.anchors === 'object' && data.anchors ? data.anchors : {};
+      for (const [textureKey, def] of Object.entries(anchors)) {
+        const tier = /^castle_tier(\d+)$/.exec(textureKey)?.[1];
+        if (tier === undefined || !R.CASTLE_ANCHORS[Number(tier)] || !def || typeof def !== 'object') continue;
+        const points = (list) => (Array.isArray(list) ? list.filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y)) : []);
+        R.CASTLE_ANCHORS[Number(tier)] = {
+          fire: Number.isFinite(def.fire?.x) && Number.isFinite(def.fire?.y) ? def.fire : null,
+          flags: points(def.flags),
+          torches: points(def.torches),
+        };
       }
 
       const sheets = data && typeof data.spritesheets === 'object' && data.spritesheets ? data.spritesheets : {};

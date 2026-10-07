@@ -1,3 +1,110 @@
 {
-  "images": {}
+  "images": {
+    "castle_tier0": "castle_tier0.png",
+    "castle_tier1": "castle_tier1.png",
+    "castle_tier2": "castle_tier2.png",
+    "castle_tier3": "castle_tier3.png",
+    "castle_tier4": "castle_tier4.png",
+    "monster_dragon": "monster_dragon.png",
+    "monster_goblin": "monster_goblin.png",
+    "monster_icegolem": "monster_icegolem.png",
+    "monster_orc": "monster_orc.png",
+    "monster_shadowlord": "monster_shadowlord.png",
+    "monster_titan": "monster_titan.png",
+    "monster_troll": "monster_troll.png",
+    "monster_wolf": "monster_wolf.png",
+    "monster_wraith": "monster_wraith.png"
+  },
+  "anchors": {
+    "castle_tier2": {
+      "flags": [
+        {
+          "x": 84,
+          "y": 64
+        },
+        {
+          "x": 220,
+          "y": 50
+        },
+        {
+          "x": 356,
+          "y": 78
+        }
+      ],
+      "torches": [
+        {
+          "x": 132,
+          "y": 360
+        },
+        {
+          "x": 308,
+          "y": 360
+        }
+      ]
+    },
+    "castle_tier0": {
+      "fire": {
+        "x": 220,
+        "y": 386
+      },
+      "flags": [
+        {
+          "x": 298,
+          "y": 292
+        }
+      ],
+      "torches": []
+    },
+    "castle_tier1": {
+      "flags": [
+        {
+          "x": 375,
+          "y": 182
+        }
+      ],
+      "torches": []
+    },
+    "castle_tier3": {
+      "flags": [
+        {
+          "x": 54,
+          "y": 158
+        },
+        {
+          "x": 222,
+          "y": 93
+        },
+        {
+          "x": 386,
+          "y": 158
+        }
+      ],
+      "torches": []
+    },
+    "castle_tier4": {
+      "flags": [
+        {
+          "x": 43,
+          "y": 186
+        },
+        {
+          "x": 120,
+          "y": 40
+        },
+        {
+          "x": 220,
+          "y": 10
+        },
+        {
+          "x": 334,
+          "y": 29
+        },
+        {
+          "x": 396,
+          "y": 188
+        }
+      ],
+      "torches": []
+    }
+  }
 }

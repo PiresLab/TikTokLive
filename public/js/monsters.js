@@ -30,7 +30,7 @@
     }
 
     identity(s) {
-      return `${s.wave}|${s.monsterName}|${s.monsterMaxHp}|${s.isBoss}`;
+      return `${s.wave}|${s.monsterName}|${s.monsterMaxHp}|${s.isBoss}|${s.horde ?? 0}|${s.affix ?? ''}`;
     }
 
     /** Sincroniza com o estado do motor. Retorna { changed, damage } pra o main mostrar números de dano. */
@@ -66,14 +66,40 @@
         scene.tweens.add({ targets: aura, alpha: { from: 0.25, to: 0.6 }, scale: { from: aura.scale * 0.92, to: aura.scale * 1.06 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       }
 
+      // Chefão Elite "Blindado": anel de escudo azulado pulsando em volta
+      let shield = null;
+      if (state.affix === 'armored') {
+        shield = scene.add.image(0, -size * 0.5, 'ring').setTint(0x9fc8ff).setBlendMode('ADD').setScale(size / 70).setAlpha(0.55);
+        parts.push(shield);
+        scene.tweens.add({ targets: shield, alpha: { from: 0.3, to: 0.75 }, scale: { from: shield.scale * 0.96, to: shield.scale * 1.05 }, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      }
+
       const textureKey = `monster_${slug}`;
+      // Horda: os outros monstros ficam atrás do principal e menores; todos dividem a mesma barra de vida
+      const extras = [];
+      const HORDE_SLOTS = [
+        { x: -95, y: 6, s: 0.78 },
+        { x: 85, y: 3, s: 0.74 },
+        { x: -170, y: -2, s: 0.68 },
+        { x: 155, y: -4, s: 0.66 },
+      ];
+      for (let i = 0; i < Math.min(HORDE_SLOTS.length, (state.horde ?? 1) - 1); i += 1) {
+        const slot = HORDE_SLOTS[i];
+        const extra = R.makeVisual(scene, textureKey).setOrigin(0.5, 1).setPosition(slot.x, slot.y);
+        extra.setScale(extra.baseScale * slot.s);
+        extra.slotScale = slot.s;
+        parts.push(extra);
+        extras.push(extra);
+        scene.tweens.add({ targets: extra, y: { from: slot.y, to: slot.y - 6 }, duration: R.rand(520, 780), yoyo: true, repeat: -1, delay: R.rand(0, 400), ease: 'Sine.InOut' });
+      }
+
       const sprite = R.makeVisual(scene, textureKey).setOrigin(0.5, 1);
       const bar = scene.add.graphics();
       parts.push(sprite, bar);
       container.add(parts);
       this.layer.add(container);
 
-      this.current = { container, sprite, bar, aura, size, isBoss: state.isBoss, slug, textureKey, walking: !instant };
+      this.current = { container, sprite, bar, aura, shield, extras, horde: Boolean(state.horde), size, isBoss: state.isBoss, slug, textureKey, walking: !instant };
       this.hp = state.monsterHp;
       this.maxHp = state.monsterMaxHp;
       this.drawBar();
@@ -112,7 +138,7 @@
     drawBar() {
       const cur = this.current;
       if (!cur) return;
-      const width = cur.isBoss ? 250 : 140;
+      const width = cur.isBoss ? 250 : cur.horde ? 210 : 140;
       const ratio = Math.max(0, Math.min(1, this.hp / this.maxHp));
       const y = -cur.size - 16;
       cur.bar.clear();
@@ -157,8 +183,10 @@
       this.lastHitAt = now;
       R.playOnce(this.scene, cur.sprite, cur.textureKey, 'hit');
       cur.sprite.setTintFill(0xffffff);
+      cur.extras.forEach((e) => e.setTintFill(0xffffff));
       this.scene.time.delayedCall(60, () => {
         if (cur.sprite.active) cur.sprite.clearTint();
+        cur.extras.forEach((e) => e.active && e.clearTint());
       });
       this.scene.tweens.add({
         targets: cur.sprite,
@@ -185,6 +213,8 @@
       const cy = this.groundY - cur.size * 0.5;
       this.scene.tweens.killTweensOf(cur.sprite);
       if (cur.aura) this.scene.tweens.killTweensOf(cur.aura);
+      if (cur.shield) this.scene.tweens.killTweensOf(cur.shield);
+      cur.extras.forEach((e) => this.scene.tweens.killTweensOf(e));
       cur.bar.clear();
       cur.sprite.setTintFill(0xffffff);
       this.scene.tweens.add({

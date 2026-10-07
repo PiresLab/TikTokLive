@@ -2,6 +2,10 @@
 // rankings), feed de chat em balões, fita de gift e banners narrativos.
 (function ui(R) {
   const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
+  const EVENT_LOOK = {
+    bloodMoon: { icon: '🌑', color: '#ff8a8a', fill: 0x2a0a10, border: 0xd93a4a },
+    dawnBlessing: { icon: '🌅', color: '#ffe3a0', fill: 0x2a1c08, border: 0xffc24a },
+  };
   /** Prefixo de nível nos rankings (vazio se o servidor não mandou). */
   const lv = (entry) => (entry.level ? `Nv${entry.level} ` : '');
 
@@ -67,6 +71,7 @@
       this.buildRight();
       this.buildBanner();
       this.buildLegend();
+      this.buildEventBadge();
       this.buildGoal();
       this.buildToasts();
 
@@ -198,6 +203,49 @@
           });
         },
       });
+    }
+
+    /** Selo do evento do Reino (Lua de Sangue, Bênção): ocupa o lugar da faixa "como jogar" com contagem regressiva. */
+    buildEventBadge() {
+      const s = this.scene;
+      const c = this.anchor(R.W / 2, this.legendTop, DESIGN_CX, 116);
+      c.setVisible(false);
+      this.eventBadge = c;
+      this.eventBg = this.add(s.add.graphics(), c);
+      this.eventText = this.add(s.add.text(DESIGN_CX, 131, '', TEXT({ fontSize: '15px', fontStyle: 'bold', strokeThickness: 3 })).setOrigin(0.5), c);
+      this.eventActive = null;
+      this.clockOffset = 0;
+    }
+
+    /** Hora/clima/evento do servidor: só o selo do evento mora no HUD (o resto é o cenário). */
+    setWorld(world) {
+      if (!world) return;
+      this.clockOffset = world.now - Date.now();
+      const event = world.event;
+      const changed = (event?.kind ?? null) !== (this.eventActive?.kind ?? null);
+      this.eventActive = event;
+      if (changed && event) {
+        const look = EVENT_LOOK[event.kind] ?? EVENT_LOOK.bloodMoon;
+        this.eventBg.clear();
+        panel(this.eventBg, DESIGN_CX - 240, 116, 480, 30, { radius: 15, fill: look.fill, alpha: 0.9, border: look.border });
+        this.eventLook = look;
+      }
+      this.refreshStrip();
+    }
+
+    /** Faixa de cima do HUD: evento ativo > pausado > legenda "como jogar". */
+    refreshStrip() {
+      const paused = Boolean(this.state?.paused);
+      this.eventBadge.setVisible(Boolean(this.eventActive) && !paused);
+      this.legend.setVisible(!this.eventActive && !paused);
+    }
+
+    updateEventBadge() {
+      if (!this.eventActive || !this.eventLook) return;
+      const left = Math.max(0, this.eventActive.endsAt - (Date.now() + this.clockOffset));
+      const mm = Math.floor(left / 60000);
+      const ss = String(Math.floor((left % 60000) / 1000)).padStart(2, '0');
+      this.eventText.setText(`${this.eventLook.icon} ${this.eventActive.name} · ${mm}:${ss}`).setColor(this.eventLook.color);
     }
 
     /** Meta coletiva: barra com progresso/alvo e o prêmio. No vertical fica sob o painel do Reino; no horizontal, embaixo ao centro. */
@@ -376,12 +424,13 @@
       this.eraText.setText(state.era.name);
       this.dayText.setText(`Dia ${state.seasonDay}`);
       this.kingdomNum.setText(`${fmt(state.kingdomHp)} / ${fmt(state.kingdomMaxHp)}`);
-      this.waveTitle.setText(state.isBoss ? `⚠ CHEFÃO · ONDA ${state.wave}` : `ONDA ${state.wave}`);
-      this.waveTitle.setColor(state.isBoss ? '#ffd166' : '#ffffff');
-      this.waveName.setText(state.monsterName);
+      const titleBase = state.isBoss ? (state.affix ? '⚠ CHEFÃO ELITE' : '⚠ CHEFÃO') : state.horde ? '⚔ HORDA' : '';
+      this.waveTitle.setText(titleBase ? `${titleBase} · ONDA ${state.wave}` : `ONDA ${state.wave}`);
+      this.waveTitle.setColor(state.isBoss ? '#ffd166' : state.horde ? '#ffb27a' : '#ffffff');
+      this.waveName.setText(state.affix ? `${state.monsterName} · Blindado` : state.horde ? `${state.horde}× ${state.monsterName}` : state.monsterName);
       this.monsterNum.setText(`${fmt(state.monsterHp)} / ${fmt(state.monsterMaxHp)}`);
       this.pausedText.setVisible(Boolean(state.paused));
-      this.legend.setVisible(!state.paused);
+      this.refreshStrip();
       if (state.goal) this.setGoal(state.goal, instant);
       this.redrawBars();
     }
@@ -551,6 +600,7 @@
 
     update() {
       if (!this.state) return;
+      this.updateEventBadge();
       const kd = this.kTarget - this.kDisp;
       const md = this.mTarget - this.mDisp;
       const gd = this.gTarget - this.gDisp;

@@ -22,7 +22,7 @@
     /** Efeitos ficam acima de tudo (heróis usam depth = y, ~600). */
     addTop(obj) {
       this.layer.add(obj);
-      obj.setDepth(1000);
+      obj.setDepth(5000); // acima dos heróis (depth = y, que no vertical passa de 1000)
       return obj;
     }
 

@@ -17,6 +17,8 @@ export interface ActiveEvent {
 
 /** O que o client recebe junto do estado do jogo. */
 export interface WorldState extends WorldClock {
+  /** Relógio do servidor (ms): o client compara com `event.endsAt` sem depender do relógio da máquina dele. */
+  now: number;
   weather: WeatherKind;
   event: ActiveEvent | null;
 }
@@ -66,6 +68,7 @@ export class WorldDirector {
   state(now: number, ctx: Pick<DirectorContext, 'seasonStartedAt' | 'seasonDurationMs'>): WorldState {
     return {
       ...worldClock(now, ctx.seasonStartedAt, ctx.seasonDurationMs),
+      now,
       weather: this.weather.state().kind,
       event: this.activeEvent(),
     };

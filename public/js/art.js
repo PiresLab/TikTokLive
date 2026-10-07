@@ -612,6 +612,79 @@
       ctx.fillRect(0, 0, 8, 8);
     });
 
+    // clima: gota de chuva (traço fino com cauda), floco de neve e névoa (elipse suave)
+    ensureCanvas(scene, 'drop', 4, 28, (ctx) => {
+      const grd = ctx.createLinearGradient(0, 0, 0, 28);
+      grd.addColorStop(0, 'rgba(255,255,255,0)');
+      grd.addColorStop(1, 'rgba(255,255,255,0.9)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(1, 0, 2, 28);
+    });
+    ensureCanvas(scene, 'flake', 12, 12, (ctx) => {
+      const grd = ctx.createRadialGradient(6, 6, 0, 6, 6, 6);
+      grd.addColorStop(0, 'rgba(255,255,255,1)');
+      grd.addColorStop(0.6, 'rgba(255,255,255,0.8)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, 12, 12);
+    });
+    ensureCanvas(scene, 'fog', 512, 160, (ctx) => {
+      ctx.save();
+      ctx.scale(1, 160 / 512);
+      const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+      grd.addColorStop(0, 'rgba(255,255,255,0.85)');
+      grd.addColorStop(0.55, 'rgba(255,255,255,0.35)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.restore();
+    });
+
+    // adereços de bioma (cinza claro: o jogo tinge pela Era e pela hora do dia)
+    ensureCanvas(scene, 'tree_pine', 90, 150, (ctx) => {
+      ctx.fillStyle = '#9a9a9a';
+      ctx.fillRect(41, 120, 8, 30);
+      ctx.fillStyle = '#ffffff';
+      [[10, 60, 80, 55], [18, 35, 54, 45], [26, 8, 38, 40]].forEach(([x, y, w, h], i) => {
+        ctx.fillStyle = i === 0 ? '#dcdcdc' : i === 1 ? '#ececec' : '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(x + w / 2, y);
+        ctx.lineTo(x + w, y + h);
+        ctx.lineTo(x, y + h);
+        ctx.closePath();
+        ctx.fill();
+      });
+    });
+    ensureCanvas(scene, 'tree_round', 110, 140, (ctx) => {
+      ctx.fillStyle = '#9a9a9a';
+      ctx.fillRect(50, 85, 10, 55);
+      [[55, 45, 40, '#e2e2e2'], [32, 65, 30, '#ececec'], [78, 65, 30, '#ececec'], [55, 30, 30, '#ffffff']].forEach(([x, y, r, c]) => {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+    ensureCanvas(scene, 'tree_blossom', 110, 140, (ctx) => {
+      ctx.fillStyle = '#8f8f8f';
+      ctx.fillRect(50, 80, 10, 60);
+      ctx.fillRect(40, 70, 30, 6);
+      [[55, 42, 36, '#f4f4f4'], [30, 62, 26, '#ffffff'], [80, 62, 26, '#ffffff'], [55, 66, 28, '#e8e8e8'], [40, 36, 20, '#ffffff'], [72, 34, 18, '#ffffff']].forEach(([x, y, r, c]) => {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+    ensureCanvas(scene, 'bush', 80, 46, (ctx) => {
+      [[22, 30, 18, '#e0e0e0'], [42, 24, 22, '#f2f2f2'], [60, 30, 18, '#e6e6e6']].forEach(([x, y, r, c]) => {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+
     ensureCanvas(scene, 'ring', 128, 128, (ctx) => {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 6;

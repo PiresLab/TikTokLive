@@ -52,6 +52,9 @@ window.Reino = window.Reino || {};
   R.lowfx = params.has('lowfx');
   /** ?era=0..4 força o visual de uma Era (pra ajustar arte/gravar prévia) sem mexer no jogo. */
   R.forceEra = params.has('era') ? Number(params.get('era')) : null;
+  /** ?tod=0..1 força a hora do dia (0 nascer do sol, 0,25 meio-dia, 0,5 pôr do sol, 0,75 meia-noite) e ?weather=rain|storm|snow|fog|clear o clima — só pra ajustar arte. */
+  R.forceTod = params.has('tod') ? Number(params.get('tod')) : null;
+  R.forceWeather = params.get('weather');
   /** 1 = tudo; <1 reduz partículas/estrelas pra máquinas fracas. */
   R.fxScale = R.lowfx ? 0.4 : 1;
 
@@ -82,6 +85,15 @@ window.Reino = window.Reino || {};
     { name: 'Capital do Reino', skyTop: 0x231a63, skyBottom: 0xf27aa0, far: 0x7a4f88, near: 0x4a3068, ground: 0x3f7f3a },
   ];
   R.SKY_BOSS = { top: 0x1a0509, bottom: 0x6b1424 };
+
+  /** Adereços por Era (texturas geradas em art.js): poucos pinheiros no acampamento, até cerejeiras na capital. */
+  R.BIOMES = [
+    { kinds: ['tree_pine', 'bush'], count: 6 },
+    { kinds: ['tree_pine', 'tree_round', 'bush'], count: 8 },
+    { kinds: ['tree_round', 'bush', 'tree_round'], count: 9 },
+    { kinds: ['tree_round', 'bush', 'tree_blossom'], count: 9 },
+    { kinds: ['tree_blossom', 'tree_round', 'tree_blossom', 'bush'], count: 10 },
+  ];
 
   R.MONSTER_SLUGS = {
     Goblin: 'goblin',

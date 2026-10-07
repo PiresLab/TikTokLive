@@ -128,6 +128,33 @@
     </article>
 
     <article class="card">
+      <h2>Mundo <span class="muted">(dia/noite, clima e eventos do Reino)</span></h2>
+      <div class="hint" id="world-status">—</div>
+      <div class="form">
+        <label>Evento
+          <select id="ev-kind">
+            <option value="bloodMoon">🌑 Lua de Sangue</option>
+            <option value="dawnBlessing">🌅 Bênção do Amanhecer</option>
+            <option value="horde">⚔️ Horda</option>
+            <option value="eliteBoss">🛡️ Chefão Elite Blindado</option>
+          </select>
+        </label>
+        <button id="btn-event" class="btn warn">Disparar</button>
+        <label>Clima
+          <select id="wx-kind">
+            <option value="clear">☀️ Limpo</option>
+            <option value="rain">🌧️ Chuva</option>
+            <option value="storm">⛈️ Tempestade</option>
+            <option value="snow">❄️ Neve</option>
+            <option value="fog">🌫️ Névoa</option>
+          </select>
+        </label>
+        <button id="btn-weather" class="btn">Aplicar</button>
+      </div>
+      <div class="hint">Um evento sai sozinho a cada 8–15 min (nunca dois ao mesmo tempo). Aqui você dispara na hora, pra testar ou animar a live.</div>
+    </article>
+
+    <article class="card">
       <h2>Progressão <span class="muted">(nível, missões e conquistas dos espectadores)</span></h2>
       <div><h3>⭐ Maiores níveis</h3><ol id="r-levels"></ol></div>
       <div class="form">

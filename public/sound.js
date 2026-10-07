@@ -88,5 +88,23 @@ const Sound = (() => {
         [160, 0.3, 0.6, { type: 'sawtooth', volume: 0.18 }],
       ]),
     newSeason: () => sequence([[392, 0, 0.1], [494, 0.1, 0.1], [587, 0.2, 0.3, { volume: 0.2 }]]),
+    /** Trovão: rajada de ruído grave que some devagar. */
+    thunder: () => {
+      if (muted || forcedMute) return;
+      const c = getCtx();
+      const length = Math.floor(c.sampleRate * 1.4);
+      const buffer = c.createBuffer(1, length, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2;
+      const src = c.createBufferSource();
+      src.buffer = buffer;
+      const filter = c.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 220;
+      const gain = c.createGain();
+      gain.gain.value = 0.5;
+      src.connect(filter).connect(gain).connect(c.destination);
+      src.start();
+    },
   };
 })();

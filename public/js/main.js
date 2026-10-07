@@ -5,6 +5,12 @@
   const LEADERBOARD_POLL_MS = 15_000;
   const CASTLE_X = R.LAYOUT.castleX;
   const MONSTER_X = R.LAYOUT.monsterX;
+  const EVENT_BANNER = {
+    bloodMoon: { icon: '🌑', color: 0xff6b6b },
+    dawnBlessing: { icon: '🌅', color: 0xffd98a },
+    horde: { icon: '⚔️', color: 0xffb27a },
+    eliteBoss: { icon: '🛡️', color: 0x9fc8ff },
+  };
 
   if (R.role === 'preview') Sound.forceMute(true); // o som sai só do jogo de verdade (OBS), não do iframe do painel
 
@@ -33,6 +39,7 @@
       this.monsters = new R.Monsters(this, this.worldLayer, MONSTER_X);
       this.heroes = new R.Heroes(this, this.worldLayer, CASTLE_X);
       this.fx = new R.Fx(this, this.worldLayer, { kingdom: this.kingdom, monsters: this.monsters, heroes: this.heroes });
+      this.weather = new R.Weather(this, this.worldLayer, this.fx);
       this.hud = new R.Hud(this, this.uiLayer);
 
       this.firstState = true;
@@ -71,6 +78,7 @@
 
     update(time, delta) {
       this.bg.update(delta);
+      this.weather.update(time);
       this.kingdom.update(time);
       this.hud.update();
     }
@@ -124,6 +132,20 @@
       }
 
       this.bg.setBoss(s.isBoss);
+      if (s.world && (R.forceTod !== null || R.forceWeather)) {
+        const tod = R.forceTod !== null && Number.isFinite(R.forceTod) ? R.forceTod : s.world.timeOfDay;
+        s.world = { ...s.world, timeOfDay: tod, sunHeight: Math.sin(2 * Math.PI * tod), weather: R.forceWeather || s.world.weather };
+      }
+      if (s.world) {
+        this.bg.setWorld(s.world);
+        this.weather.set(s.world.weather);
+        this.hud.setWorld(s.world);
+        // Bênção do Amanhecer: faíscas de cura subindo do castelo enquanto dura
+        if (s.world.event?.kind === 'dawnBlessing' && this.time.now - (this.lastBlessAt ?? 0) > 1600) {
+          this.lastBlessAt = this.time.now;
+          this.fx.healBurst(this.kingdom.x + R.rand(-60, 100), R.GROUND_Y - 40);
+        }
+      }
 
       const { changed, damage } = this.monsters.set(s, first);
       if (!changed && damage > 0) {
@@ -225,6 +247,30 @@
       }
     }
 
+    /** Evento do Reino começou: banner, clarão e som próprios. Chefão Elite usa o banner de chefão (bossSpawned). */
+    applyEventStarted(n) {
+      const look = EVENT_BANNER[n.event];
+      if (!look) return;
+      if (n.event !== 'eliteBoss') this.hud.banner(`${look.icon} ${n.name}`, R.hex(look.color), 2600, n.flavor);
+      switch (n.event) {
+        case 'bloodMoon':
+          this.fx.flash(500, 120, 10, 20);
+          this.fx.shake(500, 0.008);
+          Sound.bossSpawned();
+          break;
+        case 'dawnBlessing':
+          this.fx.flash(420, 255, 230, 160);
+          Sound.newSeason();
+          break;
+        case 'horde':
+          this.fx.shake(450, 0.007);
+          Sound.bossSpawned();
+          break;
+        default:
+          break;
+      }
+    }
+
     // ---------------------------------------------------------------- narrativa
 
     applyNarrative(n) {
@@ -264,6 +310,14 @@
           else this.fx.confetti(this.monsters.x, R.GROUND_Y - 60, 30);
           Sound.waveCleared();
           break;
+        case 'eventStarted':
+          this.applyEventStarted(n);
+          break;
+        case 'eventEnded': {
+          const look = EVENT_BANNER[n.event];
+          if (look) this.hud.toast({ icon: look.icon, title: `${n.name} terminou`, color: look.color });
+          break;
+        }
         case 'newSeason':
           this.hud.banner(`🌅 Dia ${n.day} do Cerco`, '#ffe9a8', 3000, n.flavorText);
           this.bg.sunrise();

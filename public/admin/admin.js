@@ -121,6 +121,17 @@ function renderRankings(lb) {
   $('r-heroes').textContent = `⚔️ ${fmt(lb.heroCount)} heróis no Reino`;
 }
 
+const PHASE_LABEL = { dawn: 'amanhecer', day: 'dia', dusk: 'entardecer', night: 'noite' };
+const WEATHER_LABEL = { clear: 'limpo', rain: 'chuva', storm: 'tempestade', snow: 'neve', fog: 'névoa' };
+
+function renderWorld(g) {
+  const w = g.world;
+  if (!w) return;
+  const event = w.event ? ` · evento: ${w.event.name} (${Math.max(0, Math.round((w.event.endsAt - w.now) / 1000))}s)` : '';
+  const monster = g.horde ? ` · horda de ${g.horde}` : g.affix ? ' · chefão elite blindado' : '';
+  $('world-status').textContent = `${PHASE_LABEL[w.phase] ?? w.phase} · clima: ${WEATHER_LABEL[w.weather] ?? w.weather}${event}${monster}`;
+}
+
 function renderLevels(rows) {
   renderRankList('r-levels', rows || [], (r) => `Nv ${r.level} ${r.nickname} — ${r.title} · ${r.classKey} (${fmt(r.xp)} XP)`);
 }
@@ -241,6 +252,7 @@ async function loadStatus() {
     renderGame(s.game);
     renderRankings(s.leaderboard);
     renderLevels(s.topLevels);
+    renderWorld(s.game);
     renderBurst(s.burst);
     syncBalanceInputs(s);
     if (first) [...s.log].forEach(addFeedEntry);
@@ -359,6 +371,8 @@ function init() {
   $('btn-hurt').addEventListener('click', () => api({ cmd: 'damageKingdom', amount: numberValue('in-kingdom') }));
   $('btn-score').addEventListener('click', () => api({ cmd: 'addScore', amount: numberValue('in-score') }));
 
+  $('btn-event').addEventListener('click', () => api({ cmd: 'triggerEvent', event: $('ev-kind').value }).then(loadStatus));
+  $('btn-weather').addEventListener('click', () => api({ cmd: 'setWeather', weather: $('wx-kind').value }).then(loadStatus));
   $('btn-grantxp').addEventListener('click', () =>
     api({ cmd: 'grantXp', nickname: $('xp-nick').value, amount: numberValue('xp-amount') }).then(loadStatus),
   );

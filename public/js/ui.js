@@ -56,13 +56,16 @@
       this.giftBusy = false;
 
       this.waveTop = R.vertical ? R.SAFE.top : 12; // topo do painel da onda
-      this.rowTop = R.vertical ? R.SAFE.top + 96 * K + 56 : 16; // topo da fileira Reino / rankings
+      this.legendTop = R.vertical ? R.SAFE.top + 96 * K + 10 : 116; // faixa "como jogar" logo abaixo do painel da onda
+      this.rowTop = R.vertical ? this.legendTop + 30 * K + 16 : 16; // topo da fileira Reino / rankings
       this.feedBottom = R.H - 16 - R.SAFE.bottom;
 
       this.buildLeft();
       this.buildWave();
       this.buildRight();
       this.buildBanner();
+      this.buildLegend();
+      this.buildGoal();
 
       this.pausedText = this.add(
         scene.add
@@ -154,6 +157,95 @@
       );
     }
 
+    /** Faixa fixa "como jogar": alterna a cada poucos segundos o que cada ação do público faz. */
+    buildLegend() {
+      const s = this.scene;
+      const tips = [
+        ['👍 Curta para atacar o monstro!', '#ffb3c8'],
+        ['💬 Comente para lançar flechas!', '#9fd3ff'],
+        ['➕ Siga para virar herói e curar o Reino!', '#7cfc9a'],
+        ['↗️ Compartilhe para chamar reforços!', '#b69cff'],
+        ['🎁 Presentes invocam feitiços enormes!', '#ffd166'],
+      ];
+      const c = this.anchor(R.W / 2, this.legendTop, DESIGN_CX, 116);
+      this.legend = c;
+      const bg = this.add(s.add.graphics(), c);
+      panel(bg, DESIGN_CX - 240, 116, 480, 30, { radius: 15, fill: 0x0e1430, alpha: 0.7, border: 0x3a4a86 });
+      this.legendText = this.add(s.add.text(DESIGN_CX, 131, '', TEXT({ fontSize: '15px', fontStyle: 'bold', strokeThickness: 3 })).setOrigin(0.5), c);
+
+      let i = 0;
+      const show = () => {
+        const [text, color] = tips[i % tips.length];
+        this.legendText.setText(text).setColor(color);
+        i += 1;
+      };
+      show();
+      s.time.addEvent({
+        delay: 4000,
+        loop: true,
+        callback: () => {
+          s.tweens.add({
+            targets: this.legendText,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => {
+              show();
+              s.tweens.add({ targets: this.legendText, alpha: 1, duration: 200 });
+            },
+          });
+        },
+      });
+    }
+
+    /** Meta coletiva: barra com progresso/alvo e o prêmio. No vertical fica sob o painel do Reino; no horizontal, embaixo ao centro. */
+    buildGoal() {
+      const s = this.scene;
+      const x = R.vertical ? R.SAFE.side : R.W / 2 - 165;
+      const y = R.vertical ? this.rowTop + 98 * K + 14 : R.H - 66;
+      const c = this.anchor(x, y, 0, 0);
+      this.goalBox = c;
+      this.goalBg = this.add(s.add.graphics(), c);
+      panel(this.goalBg, 0, 0, 330, 58, { border: 0x2f6b4a, fill: 0x0c1a1a });
+      this.goalTitle = this.add(s.add.text(12, 5, '', TEXT({ fontSize: '14px', fontStyle: 'bold', color: '#ffe9a8', strokeThickness: 3 })), c);
+      this.goalCount = this.add(s.add.text(318, 6, '', TEXT({ fontSize: '13px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 3 })).setOrigin(1, 0), c);
+      this.goalBar = this.add(s.add.graphics(), c);
+      this.goalReward = this.add(s.add.text(12, 41, '', TEXT({ fontSize: '11px', color: '#a9f5c8', strokeThickness: 2 })), c);
+      this.goal = null;
+      this.gDisp = 0;
+      this.gTarget = 0;
+    }
+
+    drawGoalBar() {
+      const kind = this.goal?.kind;
+      const colors = {
+        like: [0xff9ec0, 0xd04a7a],
+        comment: [0x9fd3ff, 0x3a7fc4],
+        follow: [0x7cfc9a, 0x2f9d56],
+        share: [0xc4b0ff, 0x6a45d1],
+      };
+      const [top, bottom] = colors[kind] ?? colors.like;
+      this.goalBar.clear();
+      bar(this.goalBar, 14, 25, 302, 12, this.gDisp, top, bottom);
+    }
+
+    setGoal(goal, instant) {
+      const sameGoal = this.goal && this.goal.kind === goal.kind && this.goal.target === goal.target;
+      this.goal = goal;
+      this.gTarget = goal.target > 0 ? goal.progress / goal.target : 0;
+      if (instant || !sameGoal) this.gDisp = this.gTarget;
+      this.goalTitle.setText(R.truncate(goal.title, 30));
+      this.goalCount.setText(`${fmt(goal.progress)} / ${fmt(goal.target)}`);
+      this.goalReward.setText(goal.rewardText);
+      this.drawGoalBar();
+    }
+
+    /** Meta cumprida: o painel dá um "pulo" e pisca em dourado. */
+    goalDone() {
+      this.scene.tweens.add({ targets: this.goalBox, scale: K * 1.1, duration: 160, yoyo: true, repeat: 1, ease: 'Sine.Out' });
+      this.goalTitle.setColor('#7cfc9a');
+      this.scene.time.delayedCall(900, () => this.goalTitle.setColor('#ffe9a8'));
+    }
+
     // ---------------------------------------------------------------- dados
 
     setState(state, instant = false) {
@@ -173,6 +265,8 @@
       this.waveName.setText(state.monsterName);
       this.monsterNum.setText(`${fmt(state.monsterHp)} / ${fmt(state.monsterMaxHp)}`);
       this.pausedText.setVisible(Boolean(state.paused));
+      this.legend.setVisible(!state.paused);
+      if (state.goal) this.setGoal(state.goal, instant);
       this.redrawBars();
     }
 
@@ -343,6 +437,11 @@
       if (!this.state) return;
       const kd = this.kTarget - this.kDisp;
       const md = this.mTarget - this.mDisp;
+      const gd = this.gTarget - this.gDisp;
+      if (Math.abs(gd) > 0.0008) {
+        this.gDisp += gd * 0.18;
+        this.drawGoalBar();
+      }
       if (Math.abs(kd) > 0.0008 || Math.abs(md) > 0.0008) {
         this.kDisp += kd * 0.18;
         this.mDisp += md * 0.18;

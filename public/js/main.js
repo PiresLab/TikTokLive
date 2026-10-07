@@ -209,6 +209,13 @@
           Sound.kingdomFall();
           this.time.delayedCall(2300, () => this.kingdom.rebuild());
           break;
+        case 'goalCompleted':
+          this.hud.banner('🎯 Meta cumprida!', '#7cfc9a', 1500, n.rewardText);
+          this.hud.goalDone();
+          if (n.reward === 'heal') this.fx.healBurst(this.kingdom.x + 20, R.GROUND_Y - 40);
+          else this.fx.confetti(this.monsters.x, R.GROUND_Y - 60, 30);
+          Sound.waveCleared();
+          break;
         case 'newSeason':
           this.hud.banner(`🌅 Dia ${n.day} do Cerco`, '#ffe9a8', 3000, n.flavorText);
           this.bg.sunrise();

@@ -7,6 +7,7 @@ import {
   type BalanceConfig,
   type BalanceValidation,
 } from './balance.js';
+import { GoalTracker, type GoalCompletion, type GoalInfo, type GoalKind } from './goals.js';
 
 export interface EraInfo {
   tier: number;
@@ -32,14 +33,15 @@ export interface GameState {
 }
 
 /** GameState + campos derivados/de runtime (não persistidos, recalculados a cada leitura). */
-export type GameStateView = GameState & { era: EraInfo; paused: boolean };
+export type GameStateView = GameState & { era: EraInfo; paused: boolean; goal: GoalInfo };
 
 export type NarrativeEvent =
   | { kind: 'waveCleared'; wave: number }
   | { kind: 'bossSpawned'; name: string; hp: number }
   | { kind: 'bossDefeated'; name: string }
   | { kind: 'kingdomFall' }
-  | { kind: 'newSeason'; day: number; flavorText: string };
+  | { kind: 'newSeason'; day: number; flavorText: string }
+  | { kind: 'goalCompleted'; title: string; rewardText: string; reward: 'heal' | 'damage' };
 
 export interface SeasonEndedInfo {
   day: number;
@@ -161,6 +163,7 @@ export class GameEngine extends EventEmitter {
   private state: GameState;
   private balance: BalanceConfig;
   private paused = false;
+  private readonly goals = new GoalTracker();
   private readonly seasonDurationMs: number;
   private tickHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -191,7 +194,7 @@ export class GameEngine extends EventEmitter {
   }
 
   getState(): GameStateView {
-    return { ...this.state, era: eraForState(this.state), paused: this.paused };
+    return { ...this.state, era: eraForState(this.state), paused: this.paused, goal: this.goals.current() };
   }
 
   getBalance(): BalanceConfig {
@@ -281,6 +284,12 @@ export class GameEngine extends EventEmitter {
     }
 
     if (damage > 0) this.applyDamage(damage);
+
+    const goalKind = event.type as GoalKind;
+    const goalAmount = event.type === 'like' ? (event.likeCount ?? 1) : 1;
+    const completed = event.type === 'gift' ? null : this.goals.add(goalKind, goalAmount);
+    if (completed) this.completeGoal(completed);
+
     this.emit('state', this.getState());
   }
 
@@ -332,6 +341,18 @@ export class GameEngine extends EventEmitter {
   }
 
   // ---- internos ----
+
+  private completeGoal(goal: GoalCompletion): void {
+    this.emit('narrative', {
+      kind: 'goalCompleted',
+      title: goal.title,
+      rewardText: goal.rewardText,
+      reward: goal.reward.type,
+    } satisfies NarrativeEvent);
+
+    if (goal.reward.type === 'heal') this.healKingdom(goal.reward.amount);
+    else this.applyDamage(Math.max(1, Math.round(this.state.monsterMaxHp * goal.reward.pctOfMonster)));
+  }
 
   private applyDamage(damage: number): void {
     this.state.monsterHp = Math.max(0, this.state.monsterHp - damage);
@@ -391,6 +412,8 @@ export class GameEngine extends EventEmitter {
       this.emit('state', this.getState());
       return;
     }
+
+    this.goals.tick();
 
     if (this.state.kingdomHp > 0) {
       this.state.kingdomHp = Math.max(0, this.state.kingdomHp - this.balance.kingdomDecayPerTick);

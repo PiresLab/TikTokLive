@@ -7,8 +7,8 @@ import {
   normalizeShare,
 } from './eventNormalizer.js';
 
-function fakeUser(overrides: Partial<{ id: string; nickname: string; displayId: string }> = {}) {
-  return { id: 'uid1', nickname: 'Fulano', displayId: 'fulano.tk', ...overrides } as any;
+function fakeUser(overrides: Partial<{ id: string; nickname: string; uniqueId: string }> = {}) {
+  return { id: 'uid1', nickname: 'Fulano', uniqueId: 'fulano.tk', ...overrides } as any;
 }
 
 describe('eventNormalizer', () => {
@@ -30,7 +30,7 @@ describe('eventNormalizer', () => {
     const event = normalizeGift({
       user: fakeUser(),
       giftId: '1',
-      gift: { name: 'Rosa', diamondCount: 1 },
+      gift: { type: 1, name: 'Rosa', diamondCount: 1 },
       repeatCount: 3,
       repeatEnd: 0,
     } as any);
@@ -41,7 +41,7 @@ describe('eventNormalizer', () => {
     const event = normalizeGift({
       user: fakeUser(),
       giftId: '5655',
-      gift: { name: 'Leão', diamondCount: 5000 },
+      gift: { type: 1, name: 'Leão', diamondCount: 5000 },
       repeatCount: 2,
       repeatEnd: 1,
     } as any);
@@ -50,6 +50,17 @@ describe('eventNormalizer', () => {
     expect(event?.diamondValue).toBe(5000);
     expect(event?.repeatCount).toBe(2);
     expect(event?.totalDiamondValue).toBe(10000);
+  });
+
+  it('normalizeGift treats non-combo gifts as final', () => {
+    const event = normalizeGift({
+      user: fakeUser(),
+      giftId: '7',
+      gift: { type: 2, name: 'Universo', diamondCount: 34999 },
+      repeatCount: 1,
+      repeatEnd: 0,
+    } as any);
+    expect(event?.totalDiamondValue).toBe(34999);
   });
 
   it('normalizeFollow and normalizeShare map user and counters', () => {

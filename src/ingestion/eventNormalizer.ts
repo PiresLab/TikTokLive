@@ -1,21 +1,46 @@
-import type {
-  User,
-  WebcastChatMessage,
-  WebcastGiftMessage,
-  WebcastLikeMessage,
-  WebcastSocialMessage,
-} from 'tiktok-live-connector';
+import { isStreakOver, type GiftData } from 'piratetok-live-js';
 import type { GameEvent, GameEventUser } from '../types/GameEvent.js';
 
-function toUser(user: User | undefined): GameEventUser {
+/** Campos do payload (toJSON do protobuf: int64 chega como string). */
+export interface TikTokUser {
+  id?: string | number;
+  nickname?: string;
+  uniqueId?: string;
+}
+
+export interface ChatData {
+  user?: TikTokUser;
+  content?: string;
+}
+
+export interface LikeData {
+  user?: TikTokUser;
+  count?: number | string;
+  total?: number | string;
+}
+
+export interface GiftPayload extends GiftData {
+  user?: TikTokUser;
+  giftId?: number | string;
+  gift?: GiftData['gift'] & { name?: string };
+}
+
+export interface SocialData {
+  user?: TikTokUser;
+  followCount?: number | string;
+  shareCount?: number | string;
+}
+
+function toUser(user: TikTokUser | undefined): GameEventUser {
+  const username = user?.uniqueId || 'unknown';
   return {
-    userId: user?.id ?? 'unknown',
-    username: user?.displayId ?? 'unknown',
-    nickname: user?.nickname || user?.displayId || 'unknown',
+    userId: user?.id !== undefined ? String(user.id) : 'unknown',
+    username,
+    nickname: user?.nickname || user?.uniqueId || 'unknown',
   };
 }
 
-export function normalizeChat(msg: WebcastChatMessage): GameEvent {
+export function normalizeChat(msg: ChatData): GameEvent {
   return {
     type: 'comment',
     user: toUser(msg.user),
@@ -24,30 +49,31 @@ export function normalizeChat(msg: WebcastChatMessage): GameEvent {
   };
 }
 
-export function normalizeLike(msg: WebcastLikeMessage): GameEvent {
+export function normalizeLike(msg: LikeData): GameEvent {
+  const count = Number(msg.count ?? 0);
   return {
     type: 'like',
     user: toUser(msg.user),
     timestamp: Date.now(),
-    likeCount: msg.count,
-    totalLikes: Number(msg.total ?? msg.count),
+    likeCount: count,
+    totalLikes: Number(msg.total ?? count),
   };
 }
 
-export function normalizeGift(msg: WebcastGiftMessage): GameEvent | null {
-  // repeatEnd === 1 marca o fim do combo (quando repeatável); gifts não-repetíveis
-  // disparam uma única vez com repeatEnd já em 1. Ignoramos ticks intermediários
-  // do combo (repeatEnd === 0) pra não acionar efeito de jogo a cada frame de combo.
-  if (msg.repeatEnd !== 1) return null;
+export function normalizeGift(msg: GiftPayload): GameEvent | null {
+  // Gifts "combo" (type 1) mandam totais correntes até repeatEnd === 1; ignoramos
+  // os ticks intermediários pra não acionar efeito de jogo a cada frame do combo.
+  // Gifts não-combo são sempre finais (isStreakOver cuida disso).
+  if (!isStreakOver(msg)) return null;
 
-  const diamondUnit = msg.gift?.diamondCount ?? 0;
-  const repeatCount = msg.repeatCount || 1;
+  const diamondUnit = Number(msg.gift?.diamondCount ?? 0);
+  const repeatCount = Number(msg.repeatCount) || 1;
 
   return {
     type: 'gift',
     user: toUser(msg.user),
     timestamp: Date.now(),
-    giftId: msg.giftId,
+    giftId: msg.giftId !== undefined ? String(msg.giftId) : undefined,
     giftName: msg.gift?.name,
     diamondValue: diamondUnit,
     repeatCount,
@@ -56,7 +82,7 @@ export function normalizeGift(msg: WebcastGiftMessage): GameEvent | null {
   };
 }
 
-export function normalizeFollow(msg: WebcastSocialMessage): GameEvent {
+export function normalizeFollow(msg: SocialData): GameEvent {
   return {
     type: 'follow',
     user: toUser(msg.user),
@@ -65,11 +91,11 @@ export function normalizeFollow(msg: WebcastSocialMessage): GameEvent {
   };
 }
 
-export function normalizeShare(msg: WebcastSocialMessage): GameEvent {
+export function normalizeShare(msg: SocialData): GameEvent {
   return {
     type: 'share',
     user: toUser(msg.user),
     timestamp: Date.now(),
-    shareCount: msg.shareCount,
+    shareCount: msg.shareCount !== undefined ? Number(msg.shareCount) : undefined,
   };
 }

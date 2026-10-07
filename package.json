@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Jogo interativo de live 24h no TikTok - Reino em Guerra",
   "private": true,
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "type": "module",
   "scripts": {
     "dev:probe": "tsx src/probe.ts",
@@ -19,20 +22,20 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "tiktok-live-connector": "^2.5.0",
-    "ws": "^8.18.0",
+    "dotenv": "^18.0.6",
+    "obs-websocket-js": "^5.0.8",
     "phaser": "^3.80.1",
     "pino": "^9.4.0",
     "pino-pretty": "^11.2.2",
-    "obs-websocket-js": "^5.0.8",
-    "dotenv": "^18.0.6"
+    "piratetok-live-js": "^0.3.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.2",
-    "tsx": "^4.19.0",
     "@types/node": "^24.0.0",
     "@types/ws": "^8.5.12",
-    "vitest": "^2.1.1",
-    "pm2": "^7.0.4"
+    "pm2": "^7.0.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
   }
 }

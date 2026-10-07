@@ -129,7 +129,7 @@ npm test
 
 ## Estrutura
 
-- `src/ingestion/tiktokClient.ts` — wrapper do `tiktok-live-connector`, isola a lib não-oficial do resto do jogo.
+- `src/ingestion/tiktokClient.ts` — wrapper do `piratetok-live-js`, isola a lib não-oficial do resto do jogo.
 - `src/ingestion/eventNormalizer.ts` — converte evento bruto do TikTok em `GameEvent` tipado.
 - `src/types/GameEvent.ts` — schema interno de evento, único contrato que o motor do jogo consome.
 - `src/app.ts` — fiação única (motor, WS, HTTP, banco, stats, season, OBS, admin). `index.ts` pluga o TikTok; `devInjector.ts` pluga eventos falsos.

@@ -3,13 +3,16 @@ import type { IncomingMessage } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { logger } from '../logger.js';
 import type { GameStateView, NarrativeEvent } from '../gameEngine/GameEngine.js';
+import type { ProfileCard, ProgressMessage } from '../progression/ProgressionService.js';
 import type { GameEvent } from '../types/GameEvent.js';
 import { checkAdminWs } from './adminGuard.js';
 
 export type OutboundMessage =
   | { type: 'state'; payload: GameStateView }
   | { type: 'fx'; payload: GameEvent }
-  | { type: 'narrative'; payload: NarrativeEvent };
+  | { type: 'narrative'; payload: NarrativeEvent }
+  | { type: 'progress'; payload: ProgressMessage }
+  | { type: 'profile'; payload: ProfileCard };
 
 /** Mensagens só pro painel admin (log do feed, status, balanceamento…). */
 export interface AdminMessage {

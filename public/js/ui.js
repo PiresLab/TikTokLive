@@ -2,6 +2,8 @@
 // rankings), feed de chat em balões, fita de gift e banners narrativos.
 (function ui(R) {
   const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
+  /** Prefixo de nível nos rankings (vazio se o servidor não mandou). */
+  const lv = (entry) => (entry.level ? `Nv${entry.level} ` : '');
 
   // Os blocos do HUD são desenhados num espaço de design 1280 de largura (coordenadas
   // originais) dentro de containers âncora que posicionam/escalam por orientação.
@@ -66,6 +68,7 @@
       this.buildBanner();
       this.buildLegend();
       this.buildGoal();
+      this.buildToasts();
 
       this.pausedText = this.add(
         scene.add
@@ -246,6 +249,119 @@
       this.scene.time.delayedCall(900, () => this.goalTitle.setColor('#ffe9a8'));
     }
 
+    // ---------------------------------------------------------------- progressão: toasts e cartão de perfil
+
+    buildToasts() {
+      this.toasts = [];
+      // vertical: logo abaixo da meta coletiva; horizontal: sob o painel do Reino
+      this.toastLeft = R.SAFE.side;
+      this.toastTop = R.vertical ? this.rowTop + 98 * K + 14 + 58 * K + 14 : 124;
+      this.profile = null;
+    }
+
+    /** Aviso empilhado (nível, missão, conquista). Some sozinho; no máximo 3 na tela. */
+    toast({ icon, title, sub, color = 0xffd166 }) {
+      const s = this.scene;
+      const hexColor = `#${color.toString(16).padStart(6, '0')}`;
+      const w = 330;
+      const h = sub ? 46 : 32;
+      const box = s.add.container(0, 0).setScale(K).setAlpha(0);
+      const bg = s.add.graphics();
+      panel(bg, 0, 0, w, h, { radius: 12, border: color, fill: 0x0c1226, alpha: 0.88 });
+      const iconText = s.add.text(10, h / 2, icon, TEXT({ fontSize: '22px', strokeThickness: 0 })).setOrigin(0, 0.5);
+      const titleText = s.add.text(44, sub ? 5 : 6, R.truncate(title, 28), TEXT({ fontSize: '14px', fontStyle: 'bold', color: hexColor, strokeThickness: 3 }));
+      box.add([bg, iconText, titleText]);
+      if (sub) box.add(s.add.text(44, 25, R.truncate(sub, 36), TEXT({ fontSize: '12px', color: '#dfe6ff', strokeThickness: 2 })));
+      box.entryHeight = h * K;
+      box.y = this.toastTop;
+      this.add(box);
+
+      this.toasts.unshift(box);
+      while (this.toasts.length > 3) this.toasts.pop().destroy();
+      this.layoutToasts();
+      box.x = this.toastLeft - 40;
+      s.tweens.add({ targets: box, alpha: 1, x: this.toastLeft, duration: 240, ease: 'Back.Out' });
+      s.time.delayedCall(4200, () => {
+        if (!box.active) return;
+        s.tweens.add({
+          targets: box,
+          alpha: 0,
+          duration: 350,
+          onComplete: () => {
+            this.toasts = this.toasts.filter((t) => t !== box);
+            box.destroy();
+            this.layoutToasts();
+          },
+        });
+      });
+    }
+
+    layoutToasts() {
+      let y = this.toastTop;
+      for (const t of this.toasts) {
+        this.scene.tweens.add({ targets: t, y, duration: 180, ease: 'Sine.Out' });
+        y += t.entryHeight + 8;
+      }
+    }
+
+    /** Cartão do `!perfil` (nível, título, classe, XP, missões do dia e emblemas). Substitui o anterior. */
+    showProfile(card) {
+      const s = this.scene;
+      if (this.profile) {
+        s.tweens.killTweensOf(this.profile);
+        this.profile.destroy();
+      }
+      const classIcon = { knight: '⚔️', archer: '🏹', mage: '🔮', guardian: '🛡️' }[card.classKey] ?? '⚔️';
+      const tierColor = R.TITLE_COLORS[Math.min(R.TITLE_COLORS.length - 1, card.titleIndex)];
+      const tierHex = `#${tierColor.toString(16).padStart(6, '0')}`;
+
+      const w = 420;
+      const rows = card.missions.length;
+      const h = 134 + rows * 22 + 30;
+      const box = s.add.container(0, 0);
+      const bg = s.add.graphics();
+      panel(bg, 0, 0, w, h, { radius: 16, border: tierColor, fill: 0x0b1020, alpha: 0.94 });
+      box.add(bg);
+      box.add(s.add.text(16, 12, `${classIcon} ${R.truncate(card.nickname, 16)}`, TEXT({ fontSize: '22px', fontStyle: 'bold', strokeThickness: 4 })));
+      box.add(s.add.text(w - 16, 14, `Nv ${card.level}`, TEXT({ fontSize: '22px', fontStyle: 'bold', color: tierHex, strokeThickness: 4 })).setOrigin(1, 0));
+      box.add(s.add.text(16, 44, `${card.title} · ${card.className}`, TEXT({ fontSize: '14px', color: tierHex, strokeThickness: 2 })));
+
+      const xpBar = s.add.graphics();
+      bar(xpBar, 16, 70, w - 32, 12, card.progress, 0xffe08a, 0xd49a1f);
+      box.add(xpBar);
+      const xpLabel = card.xpForNext > 0 ? `${fmt(card.xpIntoLevel)} / ${fmt(card.xpForNext)} XP pro próximo nível` : 'Nível máximo!';
+      box.add(s.add.text(16, 86, xpLabel, TEXT({ fontSize: '12px', color: '#c9d4ff', strokeThickness: 2 })));
+
+      box.add(s.add.text(16, 110, 'Missões de hoje', TEXT({ fontSize: '13px', fontStyle: 'bold', color: '#ffd98a', strokeThickness: 2 })));
+      card.missions.forEach((m, i) => {
+        const line = `${m.done ? '✅' : '▫️'} ${m.title}  (${fmt(m.progress)}/${fmt(m.target)})`;
+        box.add(s.add.text(16, 132 + i * 22, line, TEXT({ fontSize: '13px', color: m.done ? '#7cfc9a' : '#eaf0ff', strokeThickness: 2 })));
+      });
+      const badgesY = 132 + rows * 22 + 6;
+      const badges = card.achievements.map((a) => a.icon).join(' ') || '—';
+      box.add(s.add.text(16, badgesY, `Emblemas ${card.achievements.length}/${card.achievementTotal}:  ${badges}`, TEXT({ fontSize: '13px', color: '#dfe6ff', strokeThickness: 2 })));
+
+      const scale = Math.min(K, (R.W - 40) / w);
+      box.setScale(scale * 0.85).setAlpha(0);
+      const cy = R.vertical ? 880 : 150;
+      box.setPosition(R.W / 2 - (w * scale) / 2, cy);
+      this.add(box);
+      this.profile = box;
+      s.tweens.add({ targets: box, alpha: 1, scale, duration: 260, ease: 'Back.Out' });
+      s.time.delayedCall(7000, () => {
+        if (this.profile !== box) return;
+        s.tweens.add({
+          targets: box,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => {
+            if (this.profile === box) this.profile = null;
+            box.destroy();
+          },
+        });
+      });
+    }
+
     // ---------------------------------------------------------------- dados
 
     setState(state, instant = false) {
@@ -287,8 +403,8 @@
       const hall = (data.hallOfFame ?? []).slice(0, 3);
 
       const blocks = [
-        `🏆 Presentes hoje\n${lines(gifters, (g, i) => `${i + 1}. ${R.truncate(g.nickname, 15)} — ${fmt(g.value)}💎`, '—')}`,
-        `💬 Chat hoje\n${lines(chatters, (c, i) => `${i + 1}. ${R.truncate(c.nickname, 15)} — ${fmt(c.value)}`, '—')}`,
+        `🏆 Presentes hoje\n${lines(gifters, (g, i) => `${i + 1}. ${lv(g)}${R.truncate(g.nickname, 12)} — ${fmt(g.value)}💎`, '—')}`,
+        `💬 Chat hoje\n${lines(chatters, (c, i) => `${i + 1}. ${lv(c)}${R.truncate(c.nickname, 12)} — ${fmt(c.value)}`, '—')}`,
         `👑 Hall da Fama\n${lines(hall, (h) => `Dia ${h.day}: ${R.truncate(h.topGifterNickname ?? '—', 12)} (${fmt(h.topGifterValue)}💎)`, '—')}`,
         `⚔️ ${fmt(data.heroCount ?? 0)} heróis no Reino`,
       ];

@@ -18,6 +18,38 @@ export interface LeaderboardEntry {
   userId: string;
   nickname: string;
   value: number;
+  /** Nível de progressão do usuário (preenchido pelo app, não pelo banco). */
+  level?: number;
+}
+
+/** Linha de user_stats com tudo que a progressão precisa. */
+export interface UserProgress {
+  userId: string;
+  nickname: string;
+  totalDiamondValue: number;
+  totalComments: number;
+  totalLikes: number;
+  totalFollows: number;
+  totalShares: number;
+  xp: number;
+  daysActive: number;
+  lastSeenDate: string | null;
+  isHero: number;
+  heroSince: number | null;
+}
+
+export interface MissionRow {
+  missionId: string;
+  progress: number;
+  done: number;
+}
+
+export interface ProgressPatch {
+  followDelta?: number;
+  shareDelta?: number;
+  xpDelta?: number;
+  /** Data de hoje (AAAA-MM-DD): conta 1 dia ativo quando muda. */
+  date?: string;
 }
 
 export interface HeroEntry {
@@ -41,6 +73,9 @@ export interface HallOfFameEntry {
  * depender de Visual Studio/build tools pra compilar módulo nativo no Windows.
  * Ainda é experimental na API do Node, mas suficiente pro uso local aqui.
  */
+const PROGRESS_COLUMNS =
+  'userId, nickname, totalDiamondValue, totalComments, totalLikes, totalFollows, totalShares, xp, daysActive, lastSeenDate, isHero, heroSince';
+
 export class Database {
   private readonly db: DatabaseSync;
 
@@ -93,7 +128,35 @@ export class Database {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS user_missions (
+        userId TEXT NOT NULL,
+        day INTEGER NOT NULL,
+        missionId TEXT NOT NULL,
+        progress INTEGER NOT NULL DEFAULT 0,
+        done INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (userId, day, missionId)
+      );
+
+      CREATE TABLE IF NOT EXISTS user_achievements (
+        userId TEXT NOT NULL,
+        achievementId TEXT NOT NULL,
+        unlockedAt INTEGER NOT NULL,
+        PRIMARY KEY (userId, achievementId)
+      );
     `);
+
+    // bancos criados antes da progressão: adiciona as colunas novas sem perder nada
+    this.ensureColumn('user_stats', 'totalFollows', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('user_stats', 'totalShares', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('user_stats', 'xp', 'REAL NOT NULL DEFAULT 0');
+    this.ensureColumn('user_stats', 'daysActive', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('user_stats', 'lastSeenDate', 'TEXT');
+  }
+
+  private ensureColumn(table: string, column: string, ddl: string): void {
+    const columns = this.db.prepare(`PRAGMA table_info(${table})`).all() as unknown as Array<{ name: string }>;
+    if (!columns.some((c) => c.name === column)) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
   }
 
   getSetting<T>(key: string): T | null {
@@ -166,6 +229,127 @@ export class Database {
         ...heroArgs,
         patch.userId,
       );
+  }
+
+  // ---- progressão (nível, missões, conquistas) ----
+
+  /** Soma XP/follows/shares e conta o dia ativo; cria a linha do usuário se ainda não existir. */
+  addProgress(userId: string, nickname: string, patch: ProgressPatch): void {
+    const exists = this.db.prepare('SELECT lastSeenDate FROM user_stats WHERE userId = ?').get(userId) as
+      | { lastSeenDate: string | null }
+      | undefined;
+    if (!exists) {
+      this.db
+        .prepare(
+          `INSERT INTO user_stats (userId, nickname, totalDiamondValue, totalComments, totalLikes, isHero, heroSince)
+           VALUES (?, ?, 0, 0, 0, 0, NULL)`,
+        )
+        .run(userId, nickname);
+    }
+    const newDay = patch.date !== undefined && exists?.lastSeenDate !== patch.date;
+    this.db
+      .prepare(
+        `UPDATE user_stats SET
+           nickname = ?,
+           totalFollows = totalFollows + ?,
+           totalShares = totalShares + ?,
+           xp = xp + ?,
+           daysActive = daysActive + ?,
+           lastSeenDate = COALESCE(?, lastSeenDate)
+         WHERE userId = ?`,
+      )
+      .run(nickname, patch.followDelta ?? 0, patch.shareDelta ?? 0, patch.xpDelta ?? 0, newDay ? 1 : 0, patch.date ?? null, userId);
+  }
+
+  getProgress(userId: string): UserProgress | null {
+    const row = this.db.prepare(`SELECT ${PROGRESS_COLUMNS} FROM user_stats WHERE userId = ?`).get(userId);
+    return (row as unknown as UserProgress | undefined) ?? null;
+  }
+
+  findProgressByNickname(nickname: string): UserProgress | null {
+    const row = this.db.prepare(`SELECT ${PROGRESS_COLUMNS} FROM user_stats WHERE nickname = ? ORDER BY xp DESC LIMIT 1`).get(nickname);
+    return (row as unknown as UserProgress | undefined) ?? null;
+  }
+
+  getTopXp(limit: number): UserProgress[] {
+    return this.db
+      .prepare(`SELECT ${PROGRESS_COLUMNS} FROM user_stats WHERE xp > 0 ORDER BY xp DESC LIMIT ?`)
+      .all(limit) as unknown as UserProgress[];
+  }
+
+  /** XP de vários usuários de uma vez (pra mostrar nível nos rankings). */
+  getXpMap(userIds: string[]): Map<string, number> {
+    const map = new Map<string, number>();
+    if (userIds.length === 0) return map;
+    const marks = userIds.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT userId, xp FROM user_stats WHERE userId IN (${marks})`).all(...userIds) as unknown as Array<{
+      userId: string;
+      xp: number;
+    }>;
+    for (const r of rows) map.set(r.userId, r.xp);
+    return map;
+  }
+
+  /** Heróis na tela: os `topN` de maior XP + os `recentN` mais recentes (sem repetir), mais recentes primeiro. */
+  getHeroesForDisplay(topN: number, recentN: number): UserProgress[] {
+    const top = this.db
+      .prepare(`SELECT ${PROGRESS_COLUMNS} FROM user_stats WHERE isHero = 1 ORDER BY xp DESC, heroSince DESC LIMIT ?`)
+      .all(topN) as unknown as UserProgress[];
+    const recent = this.db
+      .prepare(`SELECT ${PROGRESS_COLUMNS} FROM user_stats WHERE isHero = 1 ORDER BY heroSince DESC LIMIT ?`)
+      .all(recentN + topN) as unknown as UserProgress[];
+    const picked = new Map(top.map((u) => [u.userId, u]));
+    let added = 0;
+    for (const u of recent) {
+      if (added >= recentN) break;
+      if (!picked.has(u.userId)) {
+        picked.set(u.userId, u);
+        added += 1;
+      }
+    }
+    return [...picked.values()].sort((a, b) => (b.heroSince ?? 0) - (a.heroSince ?? 0));
+  }
+
+  getMissions(userId: string, day: number): MissionRow[] {
+    return this.db
+      .prepare('SELECT missionId, progress, done FROM user_missions WHERE userId = ? AND day = ?')
+      .all(userId, day) as unknown as MissionRow[];
+  }
+
+  saveMission(userId: string, day: number, missionId: string, progress: number, done: boolean): void {
+    this.db
+      .prepare(
+        `INSERT INTO user_missions (userId, day, missionId, progress, done) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(userId, day, missionId) DO UPDATE SET progress = excluded.progress, done = excluded.done`,
+      )
+      .run(userId, day, missionId, progress, done ? 1 : 0);
+  }
+
+  /** Dias antigos não servem mais: mantém só o dia atual e o anterior. */
+  pruneMissions(currentDay: number): void {
+    this.db.prepare('DELETE FROM user_missions WHERE day < ?').run(currentDay - 1);
+  }
+
+  getAchievements(userId: string): string[] {
+    const rows = this.db.prepare('SELECT achievementId FROM user_achievements WHERE userId = ?').all(userId) as unknown as Array<{
+      achievementId: string;
+    }>;
+    return rows.map((r) => r.achievementId);
+  }
+
+  /** true se foi desbloqueada agora (false se já tinha). */
+  unlockAchievement(userId: string, achievementId: string): boolean {
+    const result = this.db
+      .prepare('INSERT OR IGNORE INTO user_achievements (userId, achievementId, unlockedAt) VALUES (?, ?, ?)')
+      .run(userId, achievementId, Date.now());
+    return Number(result.changes) > 0;
+  }
+
+  /** Zera XP, missões e conquistas (admin). Não mexe nos totais de curtidas/comentários/gifts nem nos rankings. */
+  resetProgress(): void {
+    this.db.exec('UPDATE user_stats SET xp = 0, totalFollows = 0, totalShares = 0, daysActive = 0, lastSeenDate = NULL');
+    this.db.exec('DELETE FROM user_missions');
+    this.db.exec('DELETE FROM user_achievements');
   }
 
   getTopGifters(limit: number): LeaderboardEntry[] {

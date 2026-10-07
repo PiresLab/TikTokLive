@@ -121,6 +121,10 @@ function renderRankings(lb) {
   $('r-heroes').textContent = `⚔️ ${fmt(lb.heroCount)} heróis no Reino`;
 }
 
+function renderLevels(rows) {
+  renderRankList('r-levels', rows || [], (r) => `Nv ${r.level} ${r.nickname} — ${r.title} · ${r.classKey} (${fmt(r.xp)} XP)`);
+}
+
 function renderBurst(burst) {
   $('burst-status').textContent = burst
     ? `Rajada ativa: ${burst.ratePerSec} eventos/s, restam ${Math.max(0, Math.round((burst.endsAt - Date.now()) / 1000))}s`
@@ -236,6 +240,7 @@ async function loadStatus() {
     renderPills(s);
     renderGame(s.game);
     renderRankings(s.leaderboard);
+    renderLevels(s.topLevels);
     renderBurst(s.burst);
     syncBalanceInputs(s);
     if (first) [...s.log].forEach(addFeedEntry);
@@ -353,6 +358,15 @@ function init() {
   $('btn-heal').addEventListener('click', () => api({ cmd: 'healKingdom', amount: numberValue('in-kingdom') }));
   $('btn-hurt').addEventListener('click', () => api({ cmd: 'damageKingdom', amount: numberValue('in-kingdom') }));
   $('btn-score').addEventListener('click', () => api({ cmd: 'addScore', amount: numberValue('in-score') }));
+
+  $('btn-grantxp').addEventListener('click', () =>
+    api({ cmd: 'grantXp', nickname: $('xp-nick').value, amount: numberValue('xp-amount') }).then(loadStatus),
+  );
+  $('btn-resetprogress').addEventListener('click', () => {
+    if (confirm('Zerar XP, missões e conquistas de TODOS os espectadores? Não dá pra desfazer.')) {
+      api({ cmd: 'resetProgress' }).then(loadStatus);
+    }
+  });
 
   $('t-type').addEventListener('change', updateFormVisibility);
   updateFormVisibility();

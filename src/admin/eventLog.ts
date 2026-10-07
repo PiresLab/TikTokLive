@@ -37,11 +37,11 @@ export function describeEvent(event: GameEvent): string {
 export function describeNarrative(n: NarrativeEvent): string {
   switch (n.kind) {
     case 'waveCleared':
-      return `Onda ${n.wave} derrotada`;
+      return n.by ? `Onda ${n.wave} derrotada (golpe final: ${n.by.nickname})` : `Onda ${n.wave} derrotada`;
     case 'bossSpawned':
       return `Chefão ${n.name} apareceu (${n.hp} HP)`;
     case 'bossDefeated':
-      return `Chefão ${n.name} derrotado`;
+      return n.by ? `Chefão ${n.name} derrotado (golpe final: ${n.by.nickname})` : `Chefão ${n.name} derrotado`;
     case 'kingdomFall':
       return 'O Reino caiu';
     case 'newSeason':

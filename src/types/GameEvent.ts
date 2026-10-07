@@ -22,6 +22,9 @@ export interface GameEvent {
   /** Injetado pelo painel admin: afeta o jogo/efeitos, mas não grava no banco nem nos totais vitalícios. */
   isTest?: boolean;
 
+  /** Nível de progressão de quem causou o evento (preenchido ao transmitir pro client; não vem do TikTok). */
+  level?: number;
+
   /** like: curtidas no lote recebido */
   likeCount?: number;
   /** like: total acumulado de curtidas na sessão */

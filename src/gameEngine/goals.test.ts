@@ -93,3 +93,21 @@ describe('GameEngine goals', () => {
     expect(engine.getState().goal.progress).toBe(0);
   });
 });
+
+describe('GameEngine final blow attribution', () => {
+  it('reports who killed the wave and the boss, and omits test events', () => {
+    const engine = new GameEngine({ wave: 5, ...{ isBoss: true, monsterName: 'Dragão Ancião', monsterHp: 5, monsterMaxHp: 900 } });
+    const narratives: NarrativeEvent[] = [];
+    engine.on('narrative', (n: NarrativeEvent) => narratives.push(n));
+
+    engine.handleEvent(ev('gift', { totalDiamondValue: 100 }));
+    const boss = narratives.find((n) => n.kind === 'bossDefeated');
+    expect(boss).toMatchObject({ kind: 'bossDefeated', by: { userId: 'u1', nickname: 'u1' } });
+    expect(narratives.find((n) => n.kind === 'waveCleared')).toMatchObject({ by: { userId: 'u1' } });
+
+    narratives.length = 0;
+    const next = engine.getState();
+    engine.handleEvent(ev('gift', { totalDiamondValue: next.monsterMaxHp * 4, isTest: true }));
+    expect(narratives.find((n) => n.kind === 'waveCleared')).toMatchObject({ by: undefined });
+  });
+});

@@ -35,10 +35,16 @@ export interface GameState {
 /** GameState + campos derivados/de runtime (não persistidos, recalculados a cada leitura). */
 export type GameStateView = GameState & { era: EraInfo; paused: boolean; goal: GoalInfo };
 
+/** Quem causou o evento que levou à narrativa (ex.: o golpe final). Ausente em eventos de teste e no tick. */
+export interface NarrativeActor {
+  userId: string;
+  nickname: string;
+}
+
 export type NarrativeEvent =
-  | { kind: 'waveCleared'; wave: number }
+  | { kind: 'waveCleared'; wave: number; by?: NarrativeActor }
   | { kind: 'bossSpawned'; name: string; hp: number }
-  | { kind: 'bossDefeated'; name: string }
+  | { kind: 'bossDefeated'; name: string; by?: NarrativeActor }
   | { kind: 'kingdomFall' }
   | { kind: 'newSeason'; day: number; flavorText: string }
   | { kind: 'goalCompleted'; title: string; rewardText: string; reward: 'heal' | 'damage' };
@@ -164,6 +170,7 @@ export class GameEngine extends EventEmitter {
   private balance: BalanceConfig;
   private paused = false;
   private readonly goals = new GoalTracker();
+  private actor: NarrativeActor | undefined;
   private readonly seasonDurationMs: number;
   private tickHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -250,6 +257,9 @@ export class GameEngine extends EventEmitter {
       return;
     }
 
+    // quem está agindo agora (golpe final de onda/chefão); eventos de teste não contam
+    this.actor = event.isTest ? undefined : { userId: event.user.userId, nickname: event.user.nickname };
+
     let damage = 0;
     // evento de teste (painel admin) afeta o jogo, mas não os totais vitalícios
     // — senão teste suja a Era do Reino.
@@ -290,6 +300,7 @@ export class GameEngine extends EventEmitter {
     const completed = event.type === 'gift' ? null : this.goals.add(goalKind, goalAmount);
     if (completed) this.completeGoal(completed);
 
+    this.actor = undefined;
     this.emit('state', this.getState());
   }
 
@@ -366,8 +377,8 @@ export class GameEngine extends EventEmitter {
     Object.assign(this.state, freshMonster(this.state.wave, this.balance));
     this.healKingdom(this.balance.kingdomHealPerWaveCleared);
 
-    if (wasBoss) this.emit('narrative', { kind: 'bossDefeated', name: bossName } satisfies NarrativeEvent);
-    this.emit('narrative', { kind: 'waveCleared', wave: this.state.wave - 1 } satisfies NarrativeEvent);
+    if (wasBoss) this.emit('narrative', { kind: 'bossDefeated', name: bossName, by: this.actor } satisfies NarrativeEvent);
+    this.emit('narrative', { kind: 'waveCleared', wave: this.state.wave - 1, by: this.actor } satisfies NarrativeEvent);
     if (this.state.isBoss) {
       this.emit('narrative', {
         kind: 'bossSpawned',

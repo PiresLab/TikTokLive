@@ -104,3 +104,13 @@ describe('EventLog', () => {
     expect(describeNarrative({ kind: 'kingdomFall' })).toBe('O Reino caiu');
   });
 });
+
+describe('progression admin commands', () => {
+  it('validates grantXp and accepts resetProgress', () => {
+    expect(parseCommand({ cmd: 'grantXp', nickname: 'Ana', amount: 100 })).toEqual({ ok: true, command: { cmd: 'grantXp', nickname: 'Ana', amount: 100 } });
+    expect(parseCommand({ cmd: 'grantXp', nickname: '', amount: 100 }).ok).toBe(false);
+    expect(parseCommand({ cmd: 'grantXp', nickname: 'Ana', amount: -5 }).ok).toBe(false);
+    expect(parseCommand({ cmd: 'grantXp', nickname: 'Ana', amount: 1.5 }).ok).toBe(false);
+    expect(parseCommand({ cmd: 'resetProgress' })).toEqual({ ok: true, command: { cmd: 'resetProgress' } });
+  });
+});

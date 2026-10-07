@@ -14,7 +14,9 @@ export type AdminCommand =
   | { cmd: 'pause' }
   | { cmd: 'resume' }
   | { cmd: 'setBalance'; balance: Partial<BalanceConfig> }
-  | { cmd: 'resetBalance' };
+  | { cmd: 'resetBalance' }
+  | { cmd: 'grantXp'; nickname: string; amount: number }
+  | { cmd: 'resetProgress' };
 
 export type ParseResult = { ok: true; command: AdminCommand } | { ok: false; error: string };
 
@@ -32,6 +34,7 @@ export const LIMITS = {
   wave: 10_000,
   kingdomAmount: 1_000_000,
   score: 10_000_000,
+  xp: 1_000_000,
 } as const;
 
 const fail = (error: string): ParseResult => ({ ok: false, error });
@@ -140,7 +143,16 @@ export function parseCommand(input: unknown): ParseResult {
       const result = validateBalance(input.balance);
       return result.ok ? { ok: true, command: { cmd, balance: result.value } } : fail(result.error);
     }
+    case 'grantXp': {
+      const nickname = stringIn(input, 'nickname', LIMITS.nicknameLength);
+      if (!nickname.ok) return fail(nickname.error);
+      if (nickname.value === undefined) return fail('nickname é obrigatório');
+      const amount = numberIn(input, 'amount', 1, LIMITS.xp, { integer: true });
+      if (!amount.ok) return fail(amount.error);
+      return { ok: true, command: { cmd, nickname: nickname.value, amount: amount.value as number } };
+    }
     case 'stopBurst':
+    case 'resetProgress':
     case 'spawnBoss':
     case 'endSeason':
     case 'pause':

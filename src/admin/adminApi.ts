@@ -7,6 +7,7 @@ import { getHealth } from '../ops/heartbeat.js';
 import { isObsIntegrationEnabled } from '../ops/obsRefresh.js';
 import { buildTestEvent, randomFakeEvent } from '../testing/fakeEvents.js';
 import { parseCommand, type AdminCommand } from './commands.js';
+import type { ProgressionService } from '../progression/ProgressionService.js';
 import type { EventLog } from './eventLog.js';
 
 export type SourceStatus =
@@ -20,6 +21,8 @@ export interface AdminDeps {
   log: EventLog;
   getSourceStatus: () => SourceStatus;
   getLeaderboard: () => unknown;
+  progression: ProgressionService;
+  getTopLevels: () => unknown;
   saveBalance: () => void;
   clearSavedBalance: () => void;
 }
@@ -112,6 +115,11 @@ export function createAdminApi(deps: AdminDeps): AdminApi {
         engine.resetBalance();
         deps.clearSavedBalance();
         return 'balanceamento restaurado ao padrão';
+      case 'grantXp':
+        return deps.progression.grantXp(command.nickname, command.amount);
+      case 'resetProgress':
+        deps.progression.resetAll();
+        return 'progressão (XP, missões e conquistas) zerada';
     }
   }
 
@@ -130,6 +138,7 @@ export function createAdminApi(deps: AdminDeps): AdminApi {
       health: getHealth(),
       burst,
       leaderboard: deps.getLeaderboard(),
+      topLevels: deps.getTopLevels(),
       log: log.recent(100),
     };
   }

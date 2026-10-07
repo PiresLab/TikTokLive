@@ -105,6 +105,10 @@ window.Reino = window.Reino || {};
 
   R.rand = (min, max) => Math.random() * (max - min) + min;
 
+  /** Nível mínimo de cada título (espelha src/progression/levels.ts) — só pra estimar a faixa de quem acabou de chegar. */
+  R.TITLE_MIN_LEVELS = [1, 5, 10, 18, 28, 40];
+  R.titleIndexForLevel = (level) => R.TITLE_MIN_LEVELS.reduce((best, min, i) => (level >= min ? i : best), 0);
+
   /** Hash estável do texto (inteiro de 32 bits). */
   R.hashInt = (text) => {
     let hash = 0;

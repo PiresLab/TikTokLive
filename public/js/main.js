@@ -84,6 +84,8 @@
         if (msg.type === 'state') this.applyState(msg.payload);
         else if (msg.type === 'fx') this.applyFx(msg.payload);
         else if (msg.type === 'narrative') this.applyNarrative(msg.payload);
+        else if (msg.type === 'progress') this.applyProgress(msg.payload);
+        else if (msg.type === 'profile') this.hud.showProfile(msg.payload);
       };
       ws.onclose = () => setTimeout(() => this.connectWs(), 2000);
       ws.onerror = () => ws.close();
@@ -149,7 +151,7 @@
           this.fx.fireLike(e.likeCount ?? 1);
           break;
         case 'comment':
-          this.hud.addFeed(`${e.user.nickname}: ${R.truncate(e.comment, 40)}`, '#9fd3ff');
+          this.hud.addFeed(`${this.levelTag(e)}${e.user.nickname}: ${R.truncate(e.comment, 40)}`, '#9fd3ff');
           this.fx.fireComment();
           break;
         case 'gift': {
@@ -162,15 +164,61 @@
           break;
         }
         case 'follow':
-          this.hud.addFeed(`${e.user.nickname} entrou no exército do Reino!`, '#7cfc9a');
-          this.heroes.add(e.user.userId ?? e.user.nickname, e.user.nickname, true);
+          this.hud.addFeed(`${this.levelTag(e)}${e.user.nickname} entrou no exército do Reino!`, '#7cfc9a');
+          // quem acabou de seguir é Guardião; o servidor refina classe/nível no próximo sync
+          this.heroes.add(
+            e.user.userId ?? e.user.nickname,
+            e.user.nickname,
+            true,
+            e.level ? { level: e.level, titleIndex: R.titleIndexForLevel(e.level), classKey: 'guardian' } : undefined,
+          );
           this.fx.healBurst(this.kingdom.x + 20, R.GROUND_Y - 40);
           Sound.follow();
           break;
         case 'share':
-          this.hud.addFeed(`${e.user.nickname} convocou reforços!`, '#7cc4fc');
+          this.hud.addFeed(`${this.levelTag(e)}${e.user.nickname} convocou reforços!`, '#7cc4fc');
           this.fx.fireShare();
           Sound.share();
+          break;
+        default:
+          break;
+      }
+    }
+
+    /** "Nv12 " na frente do nome no feed (vazio se o servidor não mandou o nível). */
+    levelTag(e) {
+      return e.level ? `Nv${e.level} ` : '';
+    }
+
+    // ---------------------------------------------------------------- progressão
+
+    /** Nível/missão/conquista de alguém: toast no HUD, atualização do herói na tela e efeito no mundo. */
+    applyProgress(m) {
+      const now = this.time.now;
+      const quiet = now - (this.lastProgressSoundAt ?? 0) < 400; // rajada de avisos não vira rajada de som
+      if (!quiet) this.lastProgressSoundAt = now;
+
+      switch (m.kind) {
+        case 'levelUp': {
+          const color = R.TITLE_COLORS[Math.min(R.TITLE_COLORS.length - 1, m.titleIndex)];
+          this.hud.toast({ icon: '⬆️', title: `${m.user.nickname} → Nível ${m.level}`, sub: m.title, color });
+          this.heroes.update(m.user.userId, { level: m.level, titleIndex: m.titleIndex, classKey: m.classKey });
+          const pos = this.heroes.positionOf(m.user.userId);
+          if (pos) {
+            this.fx.rise(pos.x, pos.y - 40, color, 24);
+            this.fx.shockwave(pos.x, pos.y - 30, color, 2);
+            this.fx.floatText(pos.x, pos.y - 140, `NÍVEL ${m.level}!`, { color: R.hex(color), size: 24, rise: 70 });
+          }
+          if (!quiet) Sound.giftMedium();
+          break;
+        }
+        case 'mission':
+          this.hud.toast({ icon: '🎯', title: `${m.user.nickname}: missão cumprida`, sub: `${m.title} (+${m.xp} XP)`, color: 0x7cfc9a });
+          if (!quiet) Sound.follow();
+          break;
+        case 'achievement':
+          this.hud.toast({ icon: m.icon, title: `${m.user.nickname}: ${m.title}`, sub: 'Nova conquista!', color: 0xffd166 });
+          if (!quiet) Sound.waveCleared();
           break;
         default:
           break;
@@ -198,7 +246,7 @@
           Sound.bossSpawned();
           break;
         case 'bossDefeated':
-          this.hud.banner(`${n.name} foi derrotado!`, '#ffd166', 2000, '🎉');
+          this.hud.banner(`${n.name} foi derrotado!`, '#ffd166', 2000, n.by ? `🎉 Golpe final de ${n.by.nickname}!` : '🎉');
           this.fx.bossDefeated();
           Sound.bossDefeated();
           break;

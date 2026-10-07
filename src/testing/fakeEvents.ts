@@ -25,7 +25,8 @@ export function randomFakeEvent(isTest = false): GameEvent {
     return { type: 'like', user, timestamp, likeCount: Math.ceil(Math.random() * 20), isTest };
   }
   if (roll < 0.65) {
-    return { type: 'comment', user, timestamp, comment: 'Vai Reino! 🔥', isTest };
+    // 1 em cada 10 comentários pede o cartão de perfil (!perfil), pra testar o cartão sem estar ao vivo
+    return { type: 'comment', user, timestamp, comment: Math.random() < 0.1 ? '!perfil' : 'Vai Reino! 🔥', isTest };
   }
   if (roll < 0.85) {
     const gift = FAKE_GIFTS[Math.floor(Math.random() * FAKE_GIFTS.length)];

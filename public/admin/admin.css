@@ -89,6 +89,8 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .form .btn { grid-column: 1 / -1; }
 
 .preview { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #05070f; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+.preview.vertical { aspect-ratio: 9 / 16; width: min(100%, 300px); margin: 0 auto; }
+.preview-toggle { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; }
 .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
 .feed-card .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }

@@ -3,8 +3,9 @@
 (function main(R) {
   const WS_URL = `ws://${location.hostname}:8787/?role=${R.role}`;
   const LEADERBOARD_POLL_MS = 15_000;
+  // vertical: 1080 de largura — castelo (440 de largura) à esquerda, monstro à direita, com folga pros ícones do TikTok
   const CASTLE_X = 250;
-  const MONSTER_X = 900;
+  const MONSTER_X = R.vertical ? 800 : 900;
 
   if (R.role === 'preview') Sound.forceMute(true); // o som sai só do jogo de verdade (OBS), não do iframe do painel
 
@@ -227,10 +228,14 @@
     transparent: true,
     banner: false,
     fps: { target: R.lowfx ? 30 : 60 },
-    // FIT escala (com letterbox) mantendo a resolução interna 1280x720 — as
-    // posições continuam válidas em qualquer tamanho de janela/Browser Source.
+    // Qualidade máxima: antialias ligado, sem arredondar pixels (movimento sub-pixel suave)
+    // e GPU de alto desempenho. A resolução interna já é a de saída (1280x720 ou 1080x1920).
+    render: { antialias: true, antialiasGL: true, roundPixels: false, powerPreference: 'high-performance' },
+    // FIT escala (com letterbox) mantendo a resolução interna — as posições
+    // continuam válidas em qualquer tamanho de janela/Browser Source.
     scale: {
       mode: Phaser.Scale.FIT,
+      autoRound: false,
       autoCenter: Phaser.Scale.CENTER_BOTH,
       width: R.W,
       height: R.H,

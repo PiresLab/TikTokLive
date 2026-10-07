@@ -5,9 +5,26 @@ window.Reino = window.Reino || {};
 (function theme(R) {
   const params = new URLSearchParams(location.search);
 
-  R.W = 1280;
-  R.H = 720;
-  R.GROUND_Y = 575; // linha do chão: pés do castelo/monstro/heróis
+  /**
+   * Vertical (9:16) é o formato nativo do TikTok. Liga com ?vertical=1 (ou
+   * ?orientation=portrait); ?vertical=0 força horizontal. Sem parâmetro, detecta
+   * pelo tamanho da janela/Browser Source (altura > largura = vertical).
+   */
+  const orientation = params.get('orientation');
+  R.vertical = params.has('vertical')
+    ? params.get('vertical') !== '0'
+    : orientation === 'portrait' || (orientation === null && window.innerHeight > window.innerWidth);
+
+  // Resolução interna = resolução de saída do TikTok (1080x1920) pra render 1:1, sem reescala.
+  R.W = R.vertical ? 1080 : 1280;
+  R.H = R.vertical ? 1920 : 720;
+  R.GROUND_Y = R.vertical ? 1240 : 575; // linha do chão: pés do castelo/monstro/heróis
+  /** Fator do HUD: no celular o canvas 1080 aparece ~390pt de largura, então texto/painéis crescem. */
+  R.UI = R.vertical ? 1.4 : 1;
+  /** Zonas cobertas pela interface do TikTok (barra de cima, comentários/botões de baixo, ícones à direita). */
+  R.SAFE = R.vertical ? { top: 170, bottom: 430, side: 30, right: 30 } : { top: 0, bottom: 0, side: 24, right: 24 };
+  /** Supersampling dos textos (renderizados em 2x e reduzidos): bordas nítidas em qualquer escala. */
+  R.TEXT_RES = 2;
 
   /**
    * render  = o jogo de verdade (OBS); preview = iframe do painel admin.

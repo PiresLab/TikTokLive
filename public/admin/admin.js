@@ -314,7 +314,24 @@ function formEvent() {
 }
 
 function init() {
-  $('preview').src = '/?role=preview';
+  const previewVertical = $('preview-vertical');
+  const applyPreview = () => {
+    const vertical = previewVertical.checked;
+    $('preview-box').classList.toggle('vertical', vertical);
+    $('preview').src = `/?role=preview&vertical=${vertical ? 1 : 0}`;
+    try {
+      localStorage.setItem('previewVertical', vertical ? '1' : '0');
+    } catch {
+      // sem storage: só não lembra a escolha
+    }
+  };
+  try {
+    previewVertical.checked = localStorage.getItem('previewVertical') === '1';
+  } catch {
+    previewVertical.checked = false;
+  }
+  previewVertical.addEventListener('change', applyPreview);
+  applyPreview();
 
   for (const q of QUICK) {
     const btn = h('button', { className: 'btn', textContent: q.label });

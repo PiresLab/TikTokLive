@@ -415,7 +415,8 @@
       const t = this.scene.add
         .text(x, y, text, {
           fontFamily: R.FONT,
-          fontSize: `${o.size ?? 22}px`,
+          fontSize: `${Math.round((o.size ?? 22) * R.UI)}px`,
+          resolution: R.TEXT_RES,
           fontStyle: 'bold',
           color: o.color ?? '#ffffff',
           stroke: '#10131f',

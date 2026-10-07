@@ -2,7 +2,7 @@
 // lua, montanhas em parallax e chão.
 (function background(R) {
   const SKY_H = R.GROUND_Y + 24;
-  const GRADIENT_H = 430;
+  const GRADIENT_H = R.GROUND_Y - 145;
 
   class Parallax {
     constructor(scene, layer, key, y, speed) {
@@ -43,10 +43,11 @@
       this.skyFill = scene.add.image(0, GRADIENT_H - 1, 'px').setOrigin(0, 0).setDisplaySize(R.W, SKY_H - GRADIENT_H + 1);
       layer.add([this.sky, this.skyFill]);
 
-      const starCount = Math.round(70 * R.fxScale);
+      const skyStarsH = R.GROUND_Y - 245; // estrelas só no céu acima das montanhas
+      const starCount = Math.round(70 * R.fxScale * (skyStarsH / 330));
       for (let i = 0; i < starCount; i += 1) {
         const star = scene.add
-          .image(R.rand(0, R.W), R.rand(0, 330), 'star')
+          .image(R.rand(0, R.W), R.rand(0, skyStarsH), 'star')
           .setScale(R.rand(0.6, 1.5))
           .setAlpha(R.rand(0.25, 0.9));
         layer.add(star);
@@ -60,12 +61,15 @@
         });
       }
 
-      this.moonGlow = scene.add.image(1010, 118, 'glow').setScale(2.6).setTint(0xcfd8ff).setAlpha(0.35).setBlendMode('ADD');
-      this.moon = scene.add.circle(1010, 118, 32, 0xf4f1d6);
+      // lua: canto superior direito no horizontal; no vertical desce pro horizonte (o topo é HUD/interface do TikTok)
+      const mx = R.vertical ? R.W - 130 : 1010;
+      const my = R.vertical ? R.GROUND_Y - 380 : 118;
+      this.moonGlow = scene.add.image(mx, my, 'glow').setScale(2.6).setTint(0xcfd8ff).setAlpha(0.35).setBlendMode('ADD');
+      this.moon = scene.add.circle(mx, my, 32, 0xf4f1d6);
       this.craters = [
-        scene.add.circle(998, 110, 7, 0xd9d4b0, 0.55),
-        scene.add.circle(1022, 128, 5, 0xd9d4b0, 0.5),
-        scene.add.circle(1018, 104, 3.5, 0xd9d4b0, 0.5),
+        scene.add.circle(mx - 12, my - 8, 7, 0xd9d4b0, 0.55),
+        scene.add.circle(mx + 12, my + 10, 5, 0xd9d4b0, 0.5),
+        scene.add.circle(mx + 8, my - 14, 3.5, 0xd9d4b0, 0.5),
       ];
       layer.add([this.moonGlow, this.moon, ...this.craters]);
 

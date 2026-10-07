@@ -3,11 +3,18 @@
 (function ui(R) {
   const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
 
+  // Os blocos do HUD são desenhados num espaço de design 1280 de largura (coordenadas
+  // originais) dentro de containers âncora que posicionam/escalam por orientação.
+  const DESIGN_W = 1280;
+  const DESIGN_CX = DESIGN_W / 2;
+  const K = R.UI;
+
   const TEXT = (extra) => ({
     fontFamily: R.FONT,
     color: '#eaf0ff',
     stroke: '#0b0e1a',
     strokeThickness: 3,
+    resolution: R.TEXT_RES,
     ...extra,
   });
 
@@ -48,37 +55,51 @@
       this.giftQueue = [];
       this.giftBusy = false;
 
+      this.waveTop = R.vertical ? R.SAFE.top : 12; // topo do painel da onda
+      this.rowTop = R.vertical ? R.SAFE.top + 96 * K + 56 : 16; // topo da fileira Reino / rankings
+      this.feedBottom = R.H - 16 - R.SAFE.bottom;
+
       this.buildLeft();
       this.buildWave();
       this.buildRight();
       this.buildBanner();
 
       this.pausedText = this.add(
-        scene.add.text(R.W / 2, 112, '⏸ PAUSADO', TEXT({ fontSize: '16px', fontStyle: 'bold', color: '#ffd166' })).setOrigin(0.5, 0).setVisible(false),
+        scene.add
+          .text(R.W / 2, this.waveTop + 96 * K + 8, '⏸ PAUSADO', TEXT({ fontSize: `${Math.round(16 * K)}px`, fontStyle: 'bold', color: '#ffd166' }))
+          .setOrigin(0.5, 0)
+          .setVisible(false),
       );
     }
 
-    add(obj) {
-      this.layer.add(obj);
+    add(obj, parent = this.layer) {
+      parent.add(obj);
       return obj;
+    }
+
+    /** Container escalado por K em que o ponto local (lx, ly) cai em (x, y) da tela. */
+    anchor(x, y, lx, ly) {
+      return this.add(this.scene.add.container(x - K * lx, y - K * ly).setScale(K));
     }
 
     // ---------------------------------------------------------------- construção
 
     buildLeft() {
       const s = this.scene;
-      this.leftBg = this.add(s.add.graphics());
+      const c = this.anchor(R.SAFE.side, this.rowTop, 24, 16);
+      this.leftBg = this.add(s.add.graphics(), c);
       panel(this.leftBg, 24, 16, 330, 98);
-      this.eraText = this.add(s.add.text(42, 24, '', TEXT({ fontSize: '21px', fontStyle: 'bold', color: '#ffd98a' })));
-      this.dayText = this.add(s.add.text(336, 29, '', TEXT({ fontSize: '14px', color: '#a9b8ea' })).setOrigin(1, 0));
-      this.add(s.add.text(42, 58, '🏰 Reino', TEXT({ fontSize: '13px', color: '#bfeee9' })));
-      this.kingdomNum = this.add(s.add.text(336, 59, '', TEXT({ fontSize: '12px', color: '#bfeee9' })).setOrigin(1, 0));
-      this.kBar = this.add(s.add.graphics());
+      this.eraText = this.add(s.add.text(42, 24, '', TEXT({ fontSize: '21px', fontStyle: 'bold', color: '#ffd98a' })), c);
+      this.dayText = this.add(s.add.text(336, 29, '', TEXT({ fontSize: '14px', color: '#a9b8ea' })).setOrigin(1, 0), c);
+      this.add(s.add.text(42, 58, '🏰 Reino', TEXT({ fontSize: '13px', color: '#bfeee9' })), c);
+      this.kingdomNum = this.add(s.add.text(336, 59, '', TEXT({ fontSize: '12px', color: '#bfeee9' })).setOrigin(1, 0), c);
+      this.kBar = this.add(s.add.graphics(), c);
 
       this.muteText = this.add(
         s.add
           .text(42, 92, Sound.isMuted() ? '🔇 som desligado' : '🔊 som ligado', TEXT({ fontSize: '11px', color: '#8d9bc4', strokeThickness: 2 }))
           .setInteractive({ useHandCursor: true }),
+        c,
       );
       this.muteText.on('pointerdown', () => {
         Sound.setMuted(!Sound.isMuted());
@@ -88,25 +109,28 @@
 
     buildWave() {
       const s = this.scene;
-      this.waveBg = this.add(s.add.graphics());
+      const c = this.anchor(R.W / 2, this.waveTop, DESIGN_CX, 12);
+      this.waveBg = this.add(s.add.graphics(), c);
       panel(this.waveBg, 400, 12, 480, 96, { border: 0x5a2a3a, fill: 0x1a0e1c });
-      this.waveTitle = this.add(s.add.text(R.W / 2, 20, '', TEXT({ fontSize: '24px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 4 })).setOrigin(0.5, 0));
-      this.waveName = this.add(s.add.text(R.W / 2, 50, '', TEXT({ fontSize: '14px', color: '#ffc9d3' })).setOrigin(0.5, 0));
-      this.mBar = this.add(s.add.graphics());
-      this.monsterNum = this.add(s.add.text(R.W / 2, 78, '', TEXT({ fontSize: '12px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 3 })).setOrigin(0.5, 0.5));
+      this.waveTitle = this.add(s.add.text(DESIGN_CX, 20, '', TEXT({ fontSize: '24px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 4 })).setOrigin(0.5, 0), c);
+      this.waveName = this.add(s.add.text(DESIGN_CX, 50, '', TEXT({ fontSize: '14px', color: '#ffc9d3' })).setOrigin(0.5, 0), c);
+      this.mBar = this.add(s.add.graphics(), c);
+      this.monsterNum = this.add(s.add.text(DESIGN_CX, 78, '', TEXT({ fontSize: '12px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 3 })).setOrigin(0.5, 0.5), c);
     }
 
     buildRight() {
       const s = this.scene;
-      this.rightBg = this.add(s.add.graphics());
-      this.rightTexts = ['gifters', 'chatters', 'hall', 'heroes'].map((key, i) =>
+      const c = this.anchor(R.W - R.SAFE.right - 300 * K, this.rowTop, DESIGN_W - 300 - 24, 16);
+      this.rightBg = this.add(s.add.graphics(), c);
+      this.rightTexts = ['gifters', 'chatters', 'hall', 'heroes'].map((key) =>
         this.add(
           s.add.text(
-            R.W - 40,
+            DESIGN_W - 40,
             0,
             '',
             TEXT({ fontSize: '13px', color: key === 'heroes' ? '#7cfc9a' : '#eaf0ff', align: 'left', lineSpacing: 4, strokeThickness: 2 }),
           ),
+          c,
         ),
       );
       this.renderRight({ today: { gifters: [], chatters: [] }, hallOfFame: [], heroCount: 0 });
@@ -114,11 +138,19 @@
 
     buildBanner() {
       const s = this.scene;
+      const by = R.vertical ? 760 : 300;
+      const bk = R.vertical ? 1.25 : 1;
       this.bannerText = this.add(
-        s.add.text(R.W / 2, 300, '', TEXT({ fontSize: '42px', fontStyle: 'bold', color: '#ffffff', strokeThickness: 7, align: 'center' })).setOrigin(0.5).setAlpha(0),
+        s.add
+          .text(R.W / 2, by, '', TEXT({ fontSize: `${Math.round(42 * bk)}px`, fontStyle: 'bold', color: '#ffffff', strokeThickness: 7, align: 'center', wordWrap: { width: R.W - 80 } }))
+          .setOrigin(0.5)
+          .setAlpha(0),
       );
       this.subBannerText = this.add(
-        s.add.text(R.W / 2, 352, '', TEXT({ fontSize: '19px', color: '#eaf0ff', strokeThickness: 4, align: 'center', wordWrap: { width: 620 } })).setOrigin(0.5, 0).setAlpha(0),
+        s.add
+          .text(R.W / 2, by + 52 * bk, '', TEXT({ fontSize: `${Math.round(19 * bk)}px`, color: '#eaf0ff', strokeThickness: 4, align: 'center', wordWrap: { width: R.vertical ? R.W - 140 : 620 } }))
+          .setOrigin(0.5, 0)
+          .setAlpha(0),
       );
     }
 
@@ -169,11 +201,11 @@
 
       let y = 30;
       this.rightTexts.forEach((text, i) => {
-        text.setText(blocks[i]).setPosition(R.W - 40 - 262, y);
+        text.setText(blocks[i]).setPosition(DESIGN_W - 40 - 262, y);
         y += text.height + 14;
       });
       this.rightBg.clear();
-      panel(this.rightBg, R.W - 300 - 24, 16, 300, y - 8 - 8 + 6);
+      panel(this.rightBg, DESIGN_W - 300 - 24, 16, 300, y - 8 - 8 + 6);
     }
 
     setLeaderboard(data) {
@@ -190,8 +222,8 @@
       const bg = s.add.graphics();
       bg.fillStyle(0x0b1020, 0.62);
       bg.fillRoundedRect(0, 0, w, h, 10);
-      const container = s.add.container(-w, R.H - 16 - h, [bg, label]);
-      container.entryHeight = h;
+      const container = s.add.container(-w * K, this.feedBottom - h * K, [bg, label]).setScale(K);
+      container.entryHeight = h * K;
       this.add(container);
       this.feed.push(container);
 
@@ -200,7 +232,7 @@
         oldest.destroy();
       }
       this.layoutFeed();
-      s.tweens.add({ targets: container, x: 24, duration: 260, ease: 'Back.Out' });
+      s.tweens.add({ targets: container, x: R.SAFE.side, duration: 260, ease: 'Back.Out' });
       s.time.delayedCall(6500, () => {
         if (!container.active) return;
         s.tweens.add({
@@ -217,7 +249,7 @@
     }
 
     layoutFeed() {
-      let y = R.H - 16;
+      let y = this.feedBottom;
       for (let i = this.feed.length - 1; i >= 0; i -= 1) {
         const c = this.feed[i];
         y -= c.entryHeight;
@@ -272,15 +304,18 @@
         const glow = s.add.image(0, 0, 'glow').setTint(0xffd166).setBlendMode('ADD').setDisplaySize(w * 1.6, h * 3).setAlpha(0.5);
         items.unshift(glow);
       }
-      const ribbon = s.add.container(R.W / 2, 40, items).setAlpha(0).setScale(0.7);
+      // vertical: a fita desce pro céu acima do castelo (o topo é HUD) e nunca passa da largura da tela
+      const yShow = R.vertical ? 800 : 160;
+      const scaleShow = Math.min(K, (R.W - 60) / w);
+      const ribbon = s.add.container(R.W / 2, yShow - 120, items).setAlpha(0).setScale(0.7 * scaleShow);
       this.add(ribbon);
 
       sparks.forEach((sp, i) => s.tweens.add({ targets: sp, angle: i ? -360 : 360, duration: 1800, repeat: -1 }));
-      s.tweens.add({ targets: ribbon, y: 160, alpha: 1, scale: 1, duration: 340, ease: 'Back.Out' });
+      s.tweens.add({ targets: ribbon, y: yShow, alpha: 1, scale: scaleShow, duration: 340, ease: 'Back.Out' });
       s.time.delayedCall(340 + st.hold, () => {
         s.tweens.add({
           targets: ribbon,
-          y: 130,
+          y: yShow - 30,
           alpha: 0,
           duration: 280,
           onComplete: () => {

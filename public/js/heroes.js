@@ -26,7 +26,8 @@
       const label = scene.add
         .text(0, -70, R.truncate(nickname, 10), {
           fontFamily: R.FONT,
-          fontSize: '10px',
+          fontSize: R.vertical ? '13px' : '10px',
+          resolution: R.TEXT_RES,
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#0b0e1a',

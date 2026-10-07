@@ -117,6 +117,11 @@ export function createAdminApi(deps: AdminDeps): AdminApi {
         return 'balanceamento restaurado ao padrão';
       case 'grantXp':
         return deps.progression.grantXp(command.nickname, command.amount);
+      case 'triggerEvent':
+        return `evento disparado: ${engine.adminTriggerEvent(command.event)}`;
+      case 'setWeather':
+        engine.adminSetWeather(command.weather);
+        return `clima definido: ${command.weather}`;
       case 'resetProgress':
         deps.progression.resetAll();
         return 'progressão (XP, missões e conquistas) zerada';

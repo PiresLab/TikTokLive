@@ -1,5 +1,7 @@
 import { validateBalance, type BalanceConfig } from '../gameEngine/balance.js';
 import type { TestEventSpec } from '../testing/fakeEvents.js';
+import { EVENT_KINDS, type KingdomEventKind } from '../world/events.js';
+import { WEATHER_KINDS, type WeatherKind } from '../world/weather.js';
 
 export type AdminCommand =
   | { cmd: 'inject'; event: TestEventSpec }
@@ -16,7 +18,9 @@ export type AdminCommand =
   | { cmd: 'setBalance'; balance: Partial<BalanceConfig> }
   | { cmd: 'resetBalance' }
   | { cmd: 'grantXp'; nickname: string; amount: number }
-  | { cmd: 'resetProgress' };
+  | { cmd: 'resetProgress' }
+  | { cmd: 'triggerEvent'; event: KingdomEventKind }
+  | { cmd: 'setWeather'; weather: WeatherKind };
 
 export type ParseResult = { ok: true; command: AdminCommand } | { ok: false; error: string };
 
@@ -150,6 +154,20 @@ export function parseCommand(input: unknown): ParseResult {
       const amount = numberIn(input, 'amount', 1, LIMITS.xp, { integer: true });
       if (!amount.ok) return fail(amount.error);
       return { ok: true, command: { cmd, nickname: nickname.value, amount: amount.value as number } };
+    }
+    case 'triggerEvent': {
+      const event = input.event;
+      if (typeof event !== 'string' || !(EVENT_KINDS as readonly string[]).includes(event)) {
+        return fail(`event deve ser um de: ${EVENT_KINDS.join(', ')}`);
+      }
+      return { ok: true, command: { cmd, event: event as KingdomEventKind } };
+    }
+    case 'setWeather': {
+      const weather = input.weather;
+      if (typeof weather !== 'string' || !(WEATHER_KINDS as readonly string[]).includes(weather)) {
+        return fail(`weather deve ser um de: ${WEATHER_KINDS.join(', ')}`);
+      }
+      return { ok: true, command: { cmd, weather: weather as WeatherKind } };
     }
     case 'stopBurst':
     case 'resetProgress':

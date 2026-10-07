@@ -8,6 +8,9 @@ import {
   type BalanceValidation,
 } from './balance.js';
 import { GoalTracker, type GoalCompletion, type GoalInfo, type GoalKind } from './goals.js';
+import { WorldDirector, type WorldState } from '../world/director.js';
+import { EVENT_DEFS, modifiersFor, type KingdomEventKind, type Modifiers, type MonsterAffix } from '../world/events.js';
+import type { WeatherKind } from '../world/weather.js';
 
 export interface EraInfo {
   tier: number;
@@ -30,10 +33,14 @@ export interface GameState {
   totalShares: number;
   seasonDay: number;
   seasonStartedAt: number;
+  /** Horda: quantos monstros dividem a barra de vida (ausente = monstro único). */
+  horde?: number;
+  /** Afixo do monstro atual (hoje só o chefão elite "Blindado"). */
+  affix?: MonsterAffix;
 }
 
 /** GameState + campos derivados/de runtime (não persistidos, recalculados a cada leitura). */
-export type GameStateView = GameState & { era: EraInfo; paused: boolean; goal: GoalInfo };
+export type GameStateView = GameState & { era: EraInfo; paused: boolean; goal: GoalInfo; world: WorldState };
 
 /** Quem causou o evento que levou à narrativa (ex.: o golpe final). Ausente em eventos de teste e no tick. */
 export interface NarrativeActor {
@@ -47,7 +54,9 @@ export type NarrativeEvent =
   | { kind: 'bossDefeated'; name: string; by?: NarrativeActor }
   | { kind: 'kingdomFall' }
   | { kind: 'newSeason'; day: number; flavorText: string }
-  | { kind: 'goalCompleted'; title: string; rewardText: string; reward: 'heal' | 'damage' };
+  | { kind: 'goalCompleted'; title: string; rewardText: string; reward: 'heal' | 'damage' }
+  | { kind: 'eventStarted'; event: KingdomEventKind; name: string; flavor: string; durationMs?: number }
+  | { kind: 'eventEnded'; event: KingdomEventKind; name: string };
 
 export interface SeasonEndedInfo {
   day: number;
@@ -55,6 +64,11 @@ export interface SeasonEndedInfo {
 }
 
 const TICK_MS = 1_000;
+/** Horda: vida total em relação a um monstro comum da mesma onda, e quantos monstros aparecem. */
+const HORDE_HP_FACTOR = 2.5;
+const HORDE_SIZE = 5;
+/** Chefão elite: vida em relação a um chefão normal da mesma onda. */
+const ELITE_HP_FACTOR = 1.5;
 
 // Crescimento de HP por onda (balance.monsterHpGrowth): 18%/onda composto
 // (valor original) dobrava o HP a cada ~4 ondas — em 24h simuladas
@@ -90,7 +104,7 @@ const ERA_TIERS: EraInfo[] = [
 ];
 const ERA_THRESHOLDS = [0, 500, 5_000, 25_000, 100_000];
 
-type MonsterFields = Pick<GameState, 'isBoss' | 'monsterName' | 'monsterHp' | 'monsterMaxHp'>;
+type MonsterFields = Pick<GameState, 'isBoss' | 'monsterName' | 'monsterHp' | 'monsterMaxHp' | 'horde' | 'affix'>;
 
 function monsterHpForWave(wave: number, isBoss: boolean, b: BalanceConfig): number {
   const base = Math.round(b.monsterBaseHp * b.monsterHpGrowth ** (wave - 1));
@@ -104,7 +118,8 @@ function nameForWave(wave: number, isBoss: boolean): string {
 
 function monsterFor(wave: number, isBoss: boolean, b: BalanceConfig): MonsterFields {
   const hp = monsterHpForWave(wave, isBoss, b);
-  return { isBoss, monsterName: nameForWave(wave, isBoss), monsterHp: hp, monsterMaxHp: hp };
+  // horde/affix explícitos (undefined) pra um monstro novo sempre limpar o do anterior no Object.assign
+  return { isBoss, monsterName: nameForWave(wave, isBoss), monsterHp: hp, monsterMaxHp: hp, horde: undefined, affix: undefined };
 }
 
 function freshMonster(wave: number, b: BalanceConfig): MonsterFields {
@@ -134,7 +149,7 @@ function flavorTextForDay(day: number): string {
   return FLAVOR_TEXTS[(day - 1) % FLAVOR_TEXTS.length];
 }
 
-function initialState(b: BalanceConfig): GameState {
+function initialState(b: BalanceConfig, now: number): GameState {
   const wave = 1;
   return {
     wave,
@@ -147,7 +162,7 @@ function initialState(b: BalanceConfig): GameState {
     totalFollows: 0,
     totalShares: 0,
     seasonDay: 1,
-    seasonStartedAt: Date.now(),
+    seasonStartedAt: now,
     ...freshMonster(wave, b),
   };
 }
@@ -155,6 +170,10 @@ function initialState(b: BalanceConfig): GameState {
 export interface GameEngineOptions {
   seasonDurationMs?: number;
   balance?: Partial<BalanceConfig>;
+  /** Relógio do mundo (dia/noite, clima, eventos). Injetável pra teste; padrão Date.now. */
+  now?: () => number;
+  /** Sorteio do mundo (clima/eventos). Injetável pra teste; padrão Math.random. */
+  rng?: () => number;
 }
 
 /**
@@ -170,19 +189,23 @@ export class GameEngine extends EventEmitter {
   private balance: BalanceConfig;
   private paused = false;
   private readonly goals = new GoalTracker();
+  private readonly world: WorldDirector;
+  private readonly now: () => number;
   private actor: NarrativeActor | undefined;
   private readonly seasonDurationMs: number;
   private tickHandle: ReturnType<typeof setInterval> | null = null;
 
   constructor(initial?: Partial<GameState>, options: GameEngineOptions = {}) {
     super();
+    this.now = options.now ?? Date.now;
     this.balance = mergeBalance(DEFAULT_BALANCE, options.balance ?? {});
     // merge (não substituição direta) pra snapshots antigos sem os campos
     // novos (season) ainda carregarem com defaults válidos.
-    this.state = { ...initialState(this.balance), ...initial };
+    this.state = { ...initialState(this.balance, this.now()), ...initial };
     this.state.kingdomMaxHp = this.balance.kingdomMaxHp;
     this.state.kingdomHp = Math.min(this.state.kingdomHp, this.state.kingdomMaxHp);
     this.seasonDurationMs = options.seasonDurationMs ?? DEFAULT_SEASON_DURATION_MS;
+    this.world = new WorldDirector(options.rng, this.now());
   }
 
   start(): void {
@@ -201,7 +224,18 @@ export class GameEngine extends EventEmitter {
   }
 
   getState(): GameStateView {
-    return { ...this.state, era: eraForState(this.state), paused: this.paused, goal: this.goals.current() };
+    return {
+      ...this.state,
+      era: eraForState(this.state),
+      paused: this.paused,
+      goal: this.goals.current(),
+      world: this.world.state(this.now(), { seasonStartedAt: this.state.seasonStartedAt, seasonDurationMs: this.seasonDurationMs }),
+    };
+  }
+
+  /** Multiplicadores ativos agora (evento com duração + afixo do monstro). Também serve pra testes. */
+  getModifiers(): Modifiers {
+    return modifiersFor(this.world.activeEvent()?.kind ?? null, this.state.affix);
   }
 
   getBalance(): BalanceConfig {
@@ -260,6 +294,7 @@ export class GameEngine extends EventEmitter {
     // quem está agindo agora (golpe final de onda/chefão); eventos de teste não contam
     this.actor = event.isTest ? undefined : { userId: event.user.userId, nickname: event.user.nickname };
 
+    const mods = this.getModifiers();
     let damage = 0;
     // evento de teste (painel admin) afeta o jogo, mas não os totais vitalícios
     // — senão teste suja a Era do Reino.
@@ -268,18 +303,18 @@ export class GameEngine extends EventEmitter {
     switch (event.type) {
       case 'like':
         if (countsTowardTotals) this.state.totalLikes += event.likeCount ?? 1;
-        damage = (event.likeCount ?? 1) * this.balance.dmgPerLike;
+        damage = (event.likeCount ?? 1) * this.balance.dmgPerLike * mods.like;
         break;
       case 'comment':
         if (countsTowardTotals) this.state.totalComments += 1;
-        damage = this.balance.dmgPerComment;
+        damage = this.balance.dmgPerComment * mods.comment;
         break;
       case 'gift':
         if (countsTowardTotals) {
           this.state.totalGifts += 1;
           this.state.totalDiamondValue += event.totalDiamondValue ?? 0;
         }
-        damage = (event.totalDiamondValue ?? 0) * this.balance.dmgPerDiamond;
+        damage = (event.totalDiamondValue ?? 0) * this.balance.dmgPerDiamond * mods.gift;
         break;
       case 'follow':
         if (countsTowardTotals) this.state.totalFollows += 1;
@@ -287,7 +322,7 @@ export class GameEngine extends EventEmitter {
         break;
       case 'share':
         if (countsTowardTotals) this.state.totalShares += 1;
-        damage = this.balance.dmgShareRally;
+        damage = this.balance.dmgShareRally * mods.share;
         break;
       default:
         break;
@@ -313,6 +348,24 @@ export class GameEngine extends EventEmitter {
       name: this.state.monsterName,
       hp: this.state.monsterMaxHp,
     } satisfies NarrativeEvent);
+    this.emit('state', this.getState());
+  }
+
+  /** Admin: dispara um evento do Reino agora (não espera o sorteio). */
+  adminTriggerEvent(kind: KingdomEventKind): string {
+    if (kind === 'horde') {
+      if (this.state.isBoss) throw new Error('já há um chefão em campo — a horda só vem em monstro comum');
+      if (this.state.horde) throw new Error('já há uma horda em campo');
+    }
+    if (kind === 'eliteBoss' && this.state.affix) throw new Error('já há um chefão elite em campo');
+    if ((kind === 'bloodMoon' || kind === 'dawnBlessing') && this.world.activeEvent()) throw new Error('já há um evento ativo');
+    this.startEvent(kind);
+    this.emit('state', this.getState());
+    return EVENT_DEFS[kind].name;
+  }
+
+  adminSetWeather(kind: WeatherKind): void {
+    this.world.forceWeather(kind, this.now());
     this.emit('state', this.getState());
   }
 
@@ -352,6 +405,32 @@ export class GameEngine extends EventEmitter {
   }
 
   // ---- internos ----
+
+  /** Aplica um evento que o agendador (ou o admin) escolheu. */
+  private startEvent(kind: KingdomEventKind): void {
+    const def = EVENT_DEFS[kind];
+    this.world.begin(kind, this.now());
+
+    if (kind === 'horde') {
+      const hp = Math.round(monsterHpForWave(this.state.wave, false, this.balance) * HORDE_HP_FACTOR);
+      Object.assign(this.state, { isBoss: false, monsterHp: hp, monsterMaxHp: hp, horde: HORDE_SIZE, affix: undefined });
+    } else if (kind === 'eliteBoss') {
+      const boss = monsterFor(this.state.wave, true, this.balance);
+      const hp = Math.round(boss.monsterMaxHp * ELITE_HP_FACTOR);
+      Object.assign(this.state, { ...boss, monsterHp: hp, monsterMaxHp: hp, affix: 'armored' satisfies MonsterAffix });
+    }
+
+    this.emit('narrative', {
+      kind: 'eventStarted',
+      event: kind,
+      name: def.name,
+      flavor: def.flavor,
+      durationMs: def.durationMs,
+    } satisfies NarrativeEvent);
+    if (kind === 'eliteBoss') {
+      this.emit('narrative', { kind: 'bossSpawned', name: this.state.monsterName, hp: this.state.monsterMaxHp } satisfies NarrativeEvent);
+    }
+  }
 
   private completeGoal(goal: GoalCompletion): void {
     this.emit('narrative', {
@@ -407,7 +486,7 @@ export class GameEngine extends EventEmitter {
   private rolloverSeason(): void {
     const endedInfo: SeasonEndedInfo = { day: this.state.seasonDay, waveReached: this.state.wave };
     this.state.seasonDay += 1;
-    this.state.seasonStartedAt = Date.now();
+    this.state.seasonStartedAt = this.now();
     this.resetSiege();
     this.emit('seasonEnded', endedInfo);
     this.emit('narrative', {
@@ -426,12 +505,25 @@ export class GameEngine extends EventEmitter {
 
     this.goals.tick();
 
+    const world = this.world.tick(this.now(), {
+      monsterTagged: Boolean(this.state.horde || this.state.affix),
+      isBoss: this.state.isBoss,
+      seasonStartedAt: this.state.seasonStartedAt,
+      seasonDurationMs: this.seasonDurationMs,
+    });
+    if (world.ended) {
+      this.emit('narrative', { kind: 'eventEnded', event: world.ended.kind, name: world.ended.name } satisfies NarrativeEvent);
+    }
+    if (world.started) this.startEvent(world.started);
+
+    const mods = this.getModifiers();
     if (this.state.kingdomHp > 0) {
-      this.state.kingdomHp = Math.max(0, this.state.kingdomHp - this.balance.kingdomDecayPerTick);
+      const decay = this.balance.kingdomDecayPerTick * mods.decay;
+      this.state.kingdomHp = Math.min(this.state.kingdomMaxHp, Math.max(0, this.state.kingdomHp - decay + mods.regen));
     }
     this.checkKingdomFall();
 
-    if (Date.now() - this.state.seasonStartedAt >= this.seasonDurationMs) {
+    if (this.now() - this.state.seasonStartedAt >= this.seasonDurationMs) {
       this.rolloverSeason();
     }
 

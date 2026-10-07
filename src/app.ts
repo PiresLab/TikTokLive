@@ -165,7 +165,7 @@ export function createApp(config: AppConfig): App {
   });
 
   const persistableState = (): GameState => {
-    const { era, paused, goal, ...state } = engine.getState();
+    const { era, paused, goal, world, ...state } = engine.getState();
     return state;
   };
 

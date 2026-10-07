@@ -46,6 +46,10 @@ export function describeNarrative(n: NarrativeEvent): string {
       return 'O Reino caiu';
     case 'newSeason':
       return `Dia ${n.day} do Cerco começou`;
+    case 'eventStarted':
+      return `Evento: ${n.name}`;
+    case 'eventEnded':
+      return `Evento terminou: ${n.name}`;
     case 'goalCompleted':
       return `Meta cumprida: ${n.title} (${n.rewardText})`;
   }

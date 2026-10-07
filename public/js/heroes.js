@@ -21,10 +21,16 @@
 
     makeHero(nickname) {
       const scene = this.scene;
-      const body = R.makeVisual(scene, 'hero_body').setOrigin(0.5, 1).setTint(R.hashColor(nickname));
-      const head = R.makeVisual(scene, 'hero_head').setPosition(-1, -53).setOrigin(0.5, 0.5);
+      const tint = R.hashColor(nickname);
+      // arte pronta (manifest): uma das variações completas; sem ela, o boneco procedural (corpo tingido + cabeça)
+      const variant = R.HERO_VARIANTS[Math.abs(R.hashInt(nickname)) % R.HERO_VARIANTS.length];
+      const complete = scene.textures.exists(variant);
+      const parts = complete
+        ? [R.makeVisual(scene, variant).setOrigin(0.5, 1)]
+        : [R.makeVisual(scene, 'hero_body').setOrigin(0.5, 1).setTint(tint), R.makeVisual(scene, 'hero_head').setPosition(-1, -53).setOrigin(0.5, 0.5)];
+      const body = parts[0];
       const label = scene.add
-        .text(0, -70, R.truncate(nickname, 10), {
+        .text(0, complete ? -(R.HERO_SIZE.h + 4) : -70, R.truncate(nickname, 10), {
           fontFamily: R.FONT,
           fontSize: R.vertical ? '13px' : '10px',
           resolution: R.TEXT_RES,
@@ -34,7 +40,7 @@
           strokeThickness: 3,
         })
         .setOrigin(0.5, 1);
-      const container = scene.add.container(0, 0, [body, head, label]);
+      const container = scene.add.container(0, 0, [...parts, label]);
       this.layer.add(container);
       return container;
     }

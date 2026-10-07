@@ -17,8 +17,10 @@
     "mountain_far": "mountain_far.png",
     "mountain_near": "mountain_near.png",
     "ground": "ground.png",
-    "hero_body": "hero_body.png",
-    "hero_head": "hero_head.png"
+    "hero_knight": "hero_knight.png",
+    "hero_archer": "hero_archer.png",
+    "hero_mage": "hero_mage.png",
+    "hero_guardian": "hero_guardian.png"
   },
   "anchors": {
     "castle_tier2": {

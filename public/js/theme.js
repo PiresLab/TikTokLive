@@ -105,10 +105,16 @@ window.Reino = window.Reino || {};
 
   R.rand = (min, max) => Math.random() * (max - min) + min;
 
-  /** Hash estável (nickname -> cor de herói). */
-  R.hashColor = (text) => {
+  /** Hash estável do texto (inteiro de 32 bits). */
+  R.hashInt = (text) => {
     let hash = 0;
     for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+    return hash;
+  };
+
+  /** Hash estável (nickname -> cor de herói). */
+  R.hashColor = (text) => {
+    const hash = R.hashInt(text);
     const palette = [0xe4536a, 0x4fd1c5, 0xffd166, 0x8e7dff, 0x7cfc9a, 0xff9f5a, 0x5aa9ff, 0xf78fd4];
     return palette[Math.abs(hash) % palette.length];
   };

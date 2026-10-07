@@ -41,15 +41,15 @@ Cada imagem pode ter **qualquer resolução**: o jogo a exibe no **tamanho lógi
 | `castle_tier0` … `castle_tier4` | 440×420 | 880×840 | Acampamento, Vila, Vila Fortificada, Cidade, Capital. Pés do castelo na linha y=416 (centro-baixo). |
 | `monster_goblin` `monster_wolf` `monster_orc` `monster_troll` `monster_wraith` | 190×190 | 380×380 | Monstros normais. **Olhando pra esquerda** (pro castelo), pés perto da borda de baixo. |
 | `monster_dragon` `monster_titan` `monster_shadowlord` `monster_icegolem` | 330×330 | 660×660 | Chefões, mesma regra. |
-| `hero_body` | 40×64 | 80×128 | Pintado com a cor do herói (hash do nome): desenhe em branco/cinza claro. |
-| `hero_head` | 20×20 | 40×40 | Cabeça, sem tinta. |
+| `hero_knight` `hero_archer` `hero_mage` `hero_guardian` | 72×106 | 144×212 | Heroi **completo e colorido** (sem tinta), em 3/4 olhando pra **direita** (pro monstro), pés na borda de baixo. Cada pessoa recebe uma das 4 variações pelo nome. Mais variações: edite `R.HERO_VARIANTS` em `art.js`. |
+| `hero_body` `hero_head` | 40×64 / 20×20 | 80×128 / 40×40 | **Fallback** (só usado se as 4 variações acima não existirem): corpo em branco/cinza, pintado com a cor do herói, mais a cabeça. |
 | `mountain_far`, `mountain_near` | 1280×240 | 2560×480 | **Telha horizontal**: repete (parallax), então a borda esquerda tem que emendar com a direita. Funciona em horizontal e vertical. Pintadas pela cor da Era: use branco/cinza. |
 | `ground` | 1280×185 | 2560×370 | **Telha horizontal** que repete e recebe a cor da Era. Faça a grama no topo e a terra embaixo. No vertical, abaixo da telha o jogo continua o chão com um degradê (escurecendo) calculado a partir do tom da borda de baixo da sua imagem, então a borda de baixo deve ser terra lisa. |
 | `glow` `spark` `star` `ring` `flag` `arrow` `vignette` `px` | vários | — | Texturas de efeito (brilho, faísca, estrela, onda de choque, bandeira, flecha, vinheta do chefão). Brancas: o jogo aplica a cor. Mantenha o tamanho original. |
 
 ## Spritesheets e animações
 
-- Só `monster_*` e `hero_body`/`hero_head` aceitam spritesheet (tira de quadros iguais, lidos da esquerda pra direita, de cima pra baixo; quadro 0 = primeiro).
+- Só `monster_*` e os heróis (`hero_knight`… e `hero_body`/`hero_head`) aceitam spritesheet (tira de quadros iguais, lidos da esquerda pra direita, de cima pra baixo; quadro 0 = primeiro).
 - `frameWidth`/`frameHeight` são do **arquivo** (ex.: 380 pra um monstro 2x). A proporção do quadro deve ser a do tamanho lógico.
 - Animações reconhecidas: `idle` (repete; toca sozinha), `attack` (quando o monstro investe na muralha) e `hit` (quando leva dano). `attack` e `hit` tocam uma vez e voltam pro `idle`. Todas são opcionais; sem elas o jogo usa os movimentos procedurais de sempre (balançar, piscar branco).
 - `frames` é uma lista de números de quadro; `frameRate` em quadros/segundo (padrão 8).

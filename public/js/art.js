@@ -516,12 +516,17 @@
    * Tamanho LÓGICO (em pixels do jogo) de cada textura trocável. Uma imagem do
    * manifest pode ter qualquer resolução (ex.: 2x ou 3x): é exibida neste tamanho.
    */
+  /** Heróis completos (arte pronta, sem tinta): cada pessoa recebe uma variação pelo nome. */
+  R.HERO_VARIANTS = ['hero_knight', 'hero_archer', 'hero_mage', 'hero_guardian'];
+  R.HERO_SIZE = { w: 72, h: 106 };
+
   R.sizeOf = function sizeOf(key) {
     if (/^castle_tier\d+$/.test(key)) return { w: R.CASTLE_W, h: R.CASTLE_H };
     if (key.startsWith('monster_')) {
       const size = BOSS_SLUGS.includes(key.slice(8)) ? R.BOSS_SIZE : R.NORMAL_SIZE;
       return { w: size, h: size };
     }
+    if (R.HERO_VARIANTS.includes(key)) return { w: R.HERO_SIZE.w, h: R.HERO_SIZE.h };
     if (key === 'hero_body') return { w: 40, h: 64 };
     if (key === 'hero_head') return { w: 20, h: 20 };
     if (key === 'mountain_far' || key === 'mountain_near') return { w: R.TILE_W, h: 240 };

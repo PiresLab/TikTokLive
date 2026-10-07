@@ -1,0 +1,241 @@
+// Cena principal: monta cenário/castelo/monstro/heróis/efeitos/HUD e liga o
+// WebSocket do servidor (state / fx / narrative) a eles.
+(function main(R) {
+  const WS_URL = `ws://${location.hostname}:8787/?role=${R.role}`;
+  const LEADERBOARD_POLL_MS = 15_000;
+  const CASTLE_X = 250;
+  const MONSTER_X = 900;
+
+  if (R.role === 'preview') Sound.forceMute(true); // o som sai só do jogo de verdade (OBS), não do iframe do painel
+
+  class GameScene extends Phaser.Scene {
+    constructor() {
+      super('game');
+    }
+
+    preload() {
+      R.loadManifest(this);
+    }
+
+    create() {
+      R.generateTextures(this);
+
+      // Duas camadas/câmeras: o mundo treme com shake/flash, o HUD fica parado.
+      this.worldLayer = this.add.layer();
+      this.uiLayer = this.add.layer();
+      this.uiCam = this.cameras.add(0, 0, R.W, R.H);
+      this.cameras.main.ignore(this.uiLayer);
+      this.uiCam.ignore(this.worldLayer);
+
+      this.bg = new R.Background(this, this.worldLayer);
+      this.kingdom = new R.Kingdom(this, this.worldLayer, CASTLE_X);
+      this.monsters = new R.Monsters(this, this.worldLayer, MONSTER_X);
+      this.heroes = new R.Heroes(this, this.worldLayer, CASTLE_X);
+      this.fx = new R.Fx(this, this.worldLayer, { kingdom: this.kingdom, monsters: this.monsters, heroes: this.heroes });
+      this.hud = new R.Hud(this, this.uiLayer);
+
+      this.firstState = true;
+      this.eraTier = -1;
+      this.pendingDamage = 0;
+      this.lastKingdomHp = null;
+      this.lastWaveBannerAt = 0;
+
+      this.kingdom.onEraUp = () => {
+        this.fx.eraUp(this.kingdom.x, R.GROUND_Y - 150);
+      };
+      this.monsters.onDeath = (x, y, isBoss) => this.fx.monsterDied(x, y, isBoss);
+      this.monsters.onAttack = () => {
+        this.kingdom.shake(3);
+        this.fx.shake(120, 0.002);
+      };
+
+      // números de dano agregados (a cada ~220ms) a partir da queda de HP do monstro
+      this.time.addEvent({
+        delay: 220,
+        loop: true,
+        callback: () => {
+          if (this.pendingDamage < 1) return;
+          const top = this.monsters.top();
+          this.fx.damageNumber(top.x, top.y + 30, this.pendingDamage);
+          this.pendingDamage = 0;
+        },
+      });
+
+      this.connectWs();
+      this.pollLeaderboard();
+      setInterval(() => this.pollLeaderboard(), LEADERBOARD_POLL_MS);
+
+      R.scene = this; // depuração (ex.: R.scene.game.loop.actualFps)
+    }
+
+    update(time, delta) {
+      this.bg.update(delta);
+      this.kingdom.update(time);
+      this.hud.update();
+    }
+
+    // ---------------------------------------------------------------- rede
+
+    connectWs() {
+      const ws = new WebSocket(WS_URL);
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'state') this.applyState(msg.payload);
+        else if (msg.type === 'fx') this.applyFx(msg.payload);
+        else if (msg.type === 'narrative') this.applyNarrative(msg.payload);
+      };
+      ws.onclose = () => setTimeout(() => this.connectWs(), 2000);
+      ws.onerror = () => ws.close();
+    }
+
+    async pollLeaderboard() {
+      try {
+        const res = await fetch('/api/leaderboard');
+        const data = await res.json();
+        this.hud.setLeaderboard(data);
+        this.heroes.sync(data.heroes ?? []);
+      } catch {
+        // a live segue no ar mesmo se o painel falhar uma vez; tenta de novo no próximo poll
+      }
+    }
+
+    // ---------------------------------------------------------------- estado
+
+    applyState(s) {
+      const first = this.firstState;
+      this.firstState = false;
+
+      if (R.forceEra !== null && Number.isFinite(R.forceEra)) {
+        s.era = { ...s.era, tier: R.forceEra, name: R.ERAS[R.forceEra]?.name ?? s.era.name };
+      }
+
+      if (s.era.tier !== this.eraTier) {
+        const up = this.eraTier >= 0 && s.era.tier > this.eraTier;
+        this.eraTier = s.era.tier;
+        this.bg.setEra(s.era.tier, first);
+        this.kingdom.setEra(s.era.tier, !first);
+        if (up) {
+          this.hud.banner(`✨ Nova Era: ${s.era.name}!`, '#ffd166', 2200, 'O Reino cresce com a força de vocês');
+          Sound.newSeason();
+        }
+      }
+
+      this.bg.setBoss(s.isBoss);
+
+      const { changed, damage } = this.monsters.set(s, first);
+      if (!changed && damage > 0) {
+        this.pendingDamage += damage;
+        this.monsters.hit();
+      }
+
+      this.kingdom.setHpRatio(s.kingdomHp / s.kingdomMaxHp);
+      if (!first && this.lastKingdomHp !== null && !this.kingdom.crumbling) {
+        const healed = s.kingdomHp - this.lastKingdomHp;
+        if (healed >= 8 && healed < s.kingdomMaxHp * 0.6) {
+          this.fx.floatText(this.kingdom.x + 90, R.GROUND_Y - 190, `+${Math.round(healed)}`, { color: '#7cfc9a', size: 24, rise: 50 });
+        }
+      }
+      this.lastKingdomHp = s.kingdomHp;
+
+      this.hud.setState(s, first);
+    }
+
+    // ---------------------------------------------------------------- eventos de viewer
+
+    applyFx(e) {
+      switch (e.type) {
+        case 'like':
+          this.fx.fireLike();
+          break;
+        case 'comment':
+          this.hud.addFeed(`${e.user.nickname}: ${R.truncate(e.comment, 40)}`, '#9fd3ff');
+          this.fx.fireComment();
+          break;
+        case 'gift': {
+          const tier = R.giftTier(e.totalDiamondValue ?? 0);
+          this.hud.queueGift(e, tier);
+          this.fx.fireGift(tier);
+          if (tier === R.GIFT_TIERS.high) Sound.giftHigh();
+          else if (tier === R.GIFT_TIERS.mid) Sound.giftMedium();
+          else Sound.giftLow();
+          break;
+        }
+        case 'follow':
+          this.hud.addFeed(`${e.user.nickname} entrou no exército do Reino!`, '#7cfc9a');
+          this.heroes.add(e.user.userId ?? e.user.nickname, e.user.nickname, true);
+          this.fx.healBurst(this.kingdom.x + 20, R.GROUND_Y - 40);
+          Sound.follow();
+          break;
+        case 'share':
+          this.hud.addFeed(`${e.user.nickname} convocou reforços!`, '#7cc4fc');
+          this.fx.fireShare();
+          Sound.share();
+          break;
+        default:
+          break;
+      }
+    }
+
+    // ---------------------------------------------------------------- narrativa
+
+    applyNarrative(n) {
+      switch (n.kind) {
+        case 'waveCleared': {
+          // várias ondas seguidas (gift gigante) não podem virar spam de banner
+          const now = this.time.now;
+          if (now - this.lastWaveBannerAt > 900) {
+            this.lastWaveBannerAt = now;
+            this.hud.banner(`Onda ${n.wave} derrotada!`, '#9fd3ff', 700);
+            this.fx.waveCleared();
+            Sound.waveCleared();
+          }
+          break;
+        }
+        case 'bossSpawned':
+          this.hud.banner(`⚠ CHEFÃO: ${n.name}!`, '#ffd166', 2000, 'Derrotem-no antes que o Reino caia');
+          this.fx.bossSpawned();
+          Sound.bossSpawned();
+          break;
+        case 'bossDefeated':
+          this.hud.banner(`${n.name} foi derrotado!`, '#ffd166', 2000, '🎉');
+          this.fx.bossDefeated();
+          Sound.bossDefeated();
+          break;
+        case 'kingdomFall':
+          this.hud.banner('O REINO CAIU!', '#ff6b6b', 2200, 'Reconstruindo...');
+          this.kingdom.crumble();
+          this.fx.kingdomFall();
+          Sound.kingdomFall();
+          this.time.delayedCall(2300, () => this.kingdom.rebuild());
+          break;
+        case 'newSeason':
+          this.hud.banner(`🌅 Dia ${n.day} do Cerco`, '#ffe9a8', 3000, n.flavorText);
+          this.bg.sunrise();
+          Sound.newSeason();
+          this.pollLeaderboard();
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  const game = new Phaser.Game({
+    type: Phaser.AUTO,
+    width: R.W,
+    height: R.H,
+    transparent: true,
+    banner: false,
+    fps: { target: R.lowfx ? 30 : 60 },
+    // FIT escala (com letterbox) mantendo a resolução interna 1280x720 — as
+    // posições continuam válidas em qualquer tamanho de janela/Browser Source.
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+      width: R.W,
+      height: R.H,
+    },
+    scene: GameScene,
+  });
+  R.game = game;
+})(window.Reino);

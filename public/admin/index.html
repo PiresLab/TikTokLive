@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reino em Guerra — Admin</title>
+<link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+<header class="topbar">
+  <h1>⚔️ Reino em Guerra <span class="muted">/ admin</span></h1>
+  <div class="pills" id="pills"></div>
+</header>
+
+<main class="grid">
+  <section class="col">
+    <article class="card" id="card-game">
+      <h2>Estado do jogo</h2>
+      <div class="kv">
+        <div><span class="k">Dia</span><b id="g-day">—</b></div>
+        <div><span class="k">Era</span><b id="g-era">—</b></div>
+        <div><span class="k">Onda</span><b id="g-wave">—</b></div>
+      </div>
+      <div class="bar-label"><span id="g-monster">—</span><span id="g-monster-hp" class="muted"></span></div>
+      <div class="bar monster"><div class="fill" id="g-monster-bar"></div></div>
+      <div class="bar-label"><span>Reino</span><span id="g-kingdom-hp" class="muted"></span></div>
+      <div class="bar kingdom"><div class="fill" id="g-kingdom-bar"></div></div>
+      <div class="totals" id="g-totals"></div>
+    </article>
+
+    <article class="card" id="card-controls">
+      <h2>Controles</h2>
+      <div class="row">
+        <button data-cmd="spawnBoss" class="btn warn">Chefão agora</button>
+        <button id="btn-pause" class="btn">Pausar</button>
+        <button id="btn-season" class="btn danger">Encerrar season</button>
+      </div>
+      <div class="row">
+        <label>Ir para onda <input id="in-wave" type="number" min="1" max="10000" value="10" /></label>
+        <button id="btn-wave" class="btn">Ir</button>
+      </div>
+      <div class="row">
+        <label>Reino <input id="in-kingdom" type="number" min="0" value="300" /></label>
+        <button id="btn-heal" class="btn good">Curar</button>
+        <button id="btn-hurt" class="btn danger">Danificar</button>
+      </div>
+      <div class="row">
+        <label>Score <input id="in-score" type="number" min="1" value="5000" /></label>
+        <button id="btn-score" class="btn">+ Score</button>
+        <span class="hint">pula de Era (500 / 5k / 25k / 100k)</span>
+      </div>
+    </article>
+
+    <article class="card" id="card-tests">
+      <h2>Enviar teste na live</h2>
+      <p class="hint">Afeta o jogo, os efeitos e o som, mas <b>não</b> grava no banco, no ranking nem na Era.</p>
+      <div class="quick" id="quick"></div>
+      <div class="form">
+        <label>Tipo
+          <select id="t-type">
+            <option value="like">Like</option>
+            <option value="comment">Comentário</option>
+            <option value="gift">Gift</option>
+            <option value="follow">Follow</option>
+            <option value="share">Share</option>
+          </select>
+        </label>
+        <label>Usuário <input id="t-nick" type="text" maxlength="30" placeholder="aleatório" /></label>
+        <label id="lbl-likes">Likes <input id="t-likes" type="number" min="1" max="10000" value="20" /></label>
+        <label id="lbl-comment">Texto <input id="t-comment" type="text" maxlength="200" value="Vai Reino! 🔥" /></label>
+        <label id="lbl-gift">Gift <input id="t-gift" type="text" maxlength="40" value="Leão" /></label>
+        <label id="lbl-diamonds">Diamantes <input id="t-diamonds" type="number" min="0" value="5000" /></label>
+        <label id="lbl-repeat">Combo ×<input id="t-repeat" type="number" min="1" max="1000" value="1" /></label>
+        <button id="btn-send" class="btn primary">Enviar</button>
+      </div>
+      <h3>Rajada (teste de carga ao vivo)</h3>
+      <div class="row">
+        <label>Eventos/s <input id="b-rate" type="number" min="1" max="200" value="20" /></label>
+        <label>Segundos <input id="b-secs" type="number" min="1" max="600" value="30" /></label>
+        <button id="btn-burst" class="btn warn">Iniciar</button>
+        <button id="btn-stopburst" class="btn">Parar</button>
+      </div>
+      <div class="hint" id="burst-status"></div>
+    </article>
+  </section>
+
+  <section class="col">
+    <article class="card">
+      <h2>Pré-visualização <span class="muted">(o que o OBS está mostrando)</span></h2>
+      <div class="preview"><iframe id="preview" title="Pré-visualização do jogo"></iframe></div>
+    </article>
+
+    <article class="card feed-card">
+      <h2>Feed ao vivo</h2>
+      <div class="filters">
+        <label><input type="checkbox" id="f-event" checked /> eventos</label>
+        <label><input type="checkbox" id="f-narrative" checked /> narrativa</label>
+        <label><input type="checkbox" id="f-system" checked /> sistema</label>
+        <label><input type="checkbox" id="f-hidelikes" checked /> ocultar likes</label>
+        <button id="btn-clearfeed" class="btn small">Limpar</button>
+      </div>
+      <ul class="feed" id="feed"></ul>
+    </article>
+  </section>
+
+  <section class="col">
+    <article class="card">
+      <h2>Balanceamento</h2>
+      <p class="hint">Vale na hora. HP/crescimento/chefão valem a partir da próxima onda. Fica salvo no banco.</p>
+      <div class="balance" id="balance"></div>
+      <div class="row">
+        <button id="btn-balance-save" class="btn primary">Salvar</button>
+        <button id="btn-balance-reset" class="btn">Restaurar padrão</button>
+      </div>
+      <div class="hint error" id="balance-error"></div>
+    </article>
+
+    <article class="card">
+      <h2>Rankings</h2>
+      <div class="rank-grid">
+        <div><h3>🏆 Presentes hoje</h3><ol id="r-gifters"></ol></div>
+        <div><h3>💬 Chat hoje</h3><ol id="r-chatters"></ol></div>
+        <div><h3>🏆 Presentes geral</h3><ol id="r-gifters-all"></ol></div>
+        <div><h3>👑 Hall da Fama</h3><ol id="r-hall"></ol></div>
+      </div>
+      <div class="hint" id="r-heroes"></div>
+    </article>
+  </section>
+</main>
+
+<div class="toasts" id="toasts"></div>
+<script src="/admin/admin.js"></script>
+</body>
+</html>

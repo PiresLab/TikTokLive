@@ -16,7 +16,7 @@
       // 5 por fileira, fileiras de trás pra frente (a da frente sobrepõe só o corpo da de trás, não o nome)
       const row = Math.floor(index / 5);
       const col = index % 5;
-      return { x: this.castleX + 70 + col * 92 + (row % 2) * 46, y: R.GROUND_Y + 16 + row * 28, scale: 1 - row * 0.05 };
+      return { x: this.castleX + 70 + col * 92 + (row % 2) * 46, y: R.GROUND_Y + 28 + row * 28, scale: 1 - row * 0.05 };
     }
 
     makeHero(nickname) {

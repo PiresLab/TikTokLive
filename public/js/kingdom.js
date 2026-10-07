@@ -9,7 +9,7 @@
       this.scene = scene;
       this.layer = layer;
       this.x = x;
-      this.groundY = R.GROUND_Y + 2;
+      this.groundY = R.GROUND_Y + 14;
       this.tier = -1;
       this.sprite = null;
       this.decor = [];

@@ -6,7 +6,7 @@
       this.scene = scene;
       this.layer = layer;
       this.x = x;
-      this.groundY = R.GROUND_Y + 4;
+      this.groundY = R.GROUND_Y + 16;
       this.current = null;
       this.key = null;
       this.hp = 0;
